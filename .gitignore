@@ -1,0 +1,10 @@
+asm/
+assets/
+build/
+
+*.d
+*.ld
+*.pyc
+*.rom
+
+SLUS_203.12

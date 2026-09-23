@@ -1,0 +1,80 @@
+# name: Your game name here!
+sha1: 8821b1c8b448006b744c05b818e391ac75fa9e4d
+options:
+  basename: SLUS_203.12
+  target_path: SLUS_203.12.rom
+  elf_path: build/SLUS_203.12.elf
+  base_path: .
+  platform: ps2
+  compiler: EEGCC
+
+  gp_value: 0x00571D70
+  ld_gp_expression: cod_LIT4_START + 0x7FF0
+
+  # asm_path: asm
+  # src_path: src
+  # build_path: build
+
+  ld_script_path: SLUS_203.12.ld
+  ld_dependencies: True
+  ld_wildcard_sections: True
+  ld_bss_contains_common: True
+
+  create_asm_dependencies: True
+
+  find_file_boundaries: False
+
+  o_as_suffix: True
+
+  symbol_addrs_path:
+    - symbol_addrs.txt
+  reloc_addrs_path:
+    - reloc_addrs.txt
+
+  # undefined_funcs_auto_path: undefined_funcs_auto.txt
+  # undefined_syms_auto_path: undefined_syms_auto.txt
+
+  extensions_path: tools/splat_ext
+
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+
+  named_regs_for_c_funcs: False
+
+  section_order:
+    - .text
+    - .data
+    - .rodata
+    - .vutext
+    - .lit4
+    - .sdata
+    - .sbss
+    - .bss
+
+  auto_link_sections:
+    - .data
+    - .rodata
+    - .lit4
+    - .sdata
+    - .sbss
+    - .bss
+
+segments:
+  - name: cod
+    type: code
+    start: 0x000000
+    vram: 0x00100000
+    bss_size: 0x2095F4
+    subalign: null
+    subsegments:
+      - [0x000000, asm, cod/000000] # .text
+      - [0x202500, data, cod/202500] # .data
+      - [0x44F800, rodata, cod/44F800] # .rodata
+      - [0x466500, vutext, cod/466500] # .vutext
+      - [0x469D80, lit4, cod/469D80] # .lit4
+      - [0x46A280, sdata, cod/46A280] # .sdata
+      - { type: sbss, vram: 0x0056A300, name: cod/0056A300 } # .sbss
+      - { type: bss, vram: 0x0056A380, name: cod/0056A380 } # .bss
+  - [0x46A300]
