@@ -84,8 +84,10 @@ init:
 	$(MAKE) all
 	$(MAKE) diff-init
 
+#TODO better padding than hard-coded end address
 setup:
 	$(MAKE) -C tools
+	$(OBJCOPY) -O binary --gap-fill=0x00 --pad-to 0x56A300 SLUS_203.12 SLUS_203.12.rom
 
 #### Main commands ####
 
@@ -117,18 +119,3 @@ $(BUILD_DIR)/%.o: %.s
 
 $(BUILD_DIR)/%.o: %.bin
 	$(OBJCOPY) -I binary -O elf32-big $< $@
-
-$(BUILD_DIR)/compressed/%.o: $(BUILD_DIR)/files/%
-	tools/gzip-1.2.4/gzip -c --no-name -6 < $< | python3 tools/compress_trim.py > $@.bin
-	$(OBJCOPY) -I binary -O elf32-big $@.bin $@
-
-$(BUILD_DIR)/files/game: $(BUILD_DIR)/files/game.o
-	$(OBJCOPY) --dump-section .main=$@ $<
-
-$(BUILD_DIR)/files/%: files/%
-	cp $< $@
-
-$(BUILD_DIR)/files/game.o: $(O_FILES) $(LIBULTRA_LIB) game.ld game_syms2.txt
-	$(LD) -T game.ld -T game_syms2.txt -T files/syms/undefined_funcs_auto.game.txt -T files/syms/undefined_syms_auto.game.txt --no-check-sections --accept-unknown-input-arch --emit-relocs -Map $(BUILD_DIR)/game.map -o $@
-
-#mips-linux-gnu-objcopy -O binary --gap-fill=0x00 --pad-to 0x56A300 SLUS_203.12 SLUS_203.12.rom
