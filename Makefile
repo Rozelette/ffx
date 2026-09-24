@@ -4,7 +4,7 @@ BUILD_DIR := build
 TOOLS_DIR := tools
 
 #TODO
-CC := COMPILER_PATH=$(TOOLS_DIR)/gcc_kmc/linux/2.7.2 $(TOOLS_DIR)/gcc_kmc/linux/2.7.2/gcc
+CC := COMPILER_PATH=$(TOOLS_DIR)/cc/ee-gcc2.9-991111/lib/gcc-lib/ee/2.9-ee-991111 $(TOOLS_DIR)/cc/ee-gcc2.9-991111/bin/ee-gcc
 
 AS      := $(MIPS_BINUTILS_PREFIX)as
 LD      := $(MIPS_BINUTILS_PREFIX)ld
@@ -48,7 +48,7 @@ O_FILES        := $(foreach f,$(C_FILES:.c=.o),$(BUILD_DIR)/$f) \
 $(shell mkdir -p $(foreach dir,$(SRC_DIRS) $(ASM_DIRS) $(ASSET_DIRS) compressed files $(LIB_DIRS),$(BUILD_DIR)/$(dir)))
 
 AS_FLAGS := -no-pad-sections -EL -march=5900 -mabi=eabi -I include
-C_FLAGS :=
+C_FLAGS := -I include
 D_FLAGS := -D_LANGUAGE_C
 C_FLAGS_INCLUDE := -I. -Iinclude
 AS_FLAGS_INCLUDE := -I. -Iinclude
@@ -66,7 +66,7 @@ $(ROM): $(ELF)
 	$(OBJCOPY) --gap-fill=0x00 -O binary $< $@
 
 $(ELF): $(LDSCRIPT) $(O_FILES) undefined_funcs_auto.txt undefined_syms_auto.txt
-	$(LD) -T $(LDSCRIPT) -T undefined_funcs_auto.txt -T undefined_syms_auto.txt --no-check-sections --accept-unknown-input-arch --emit-relocs -EL -Map $(MAP) -o $@
+	$(LD) -T $(LDSCRIPT) -T undefined_funcs_auto.txt -T undefined_syms_auto.txt -EL -Map $(MAP) -o $@
 
 diff-init: all
 	$(RM) -rf expected/$(BUILD_DIR)

@@ -43,6 +43,8 @@ options:
 
   named_regs_for_c_funcs: False
 
+  subalign: 0x8
+
   section_order:
     - .text
     - .data
@@ -67,9 +69,10 @@ segments:
     start: 0x000000
     vram: 0x00100000
     bss_size: 0x2095F4
-    subalign: null
     subsegments:
       - [0x000000, asm, cod/000000] # .text
+      - [0x01b9a0, c, cod/test] # .text
+      - [0x01b9e8, asm, cod/01B9E8] # .text
       - [0x202500, data, cod/202500] # .data
       - [0x44F800, rodata, cod/44F800] # .rodata
       - [0x466500, vutext, cod/466500] # .vutext
