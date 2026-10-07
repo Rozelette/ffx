@@ -12,8 +12,10 @@ NM      := $(MIPS_BINUTILS_PREFIX)nm
 OBJCOPY := $(MIPS_BINUTILS_PREFIX)objcopy
 OBJDUMP := $(MIPS_BINUTILS_PREFIX)objdump
 AR := ar
+VENV := .venv
+PYTHON         ?= $(VENV)/bin/python3
 
-SPLAT             ?= python3.9 -m splat split
+SPLAT             ?= $(PYTHON) -m splat split
 
 SPLAT_FLAGS       ?=
 
@@ -29,10 +31,10 @@ OBJCOPY_BIN = $(OBJCOPY) -O binary $@ $@.bin
 #### Files ####
 
 # ROM image
-ROM      := $(BUILD_DIR)/SLUS_203.12.rom
+ROM      := $(BUILD_DIR)/SLPS_250.88.rom
 ELF      := $(ROM:.rom=.elf)
 MAP      := $(ROM:.rom=.map)
-LDSCRIPT := SLUS_203.12.ld
+LDSCRIPT := SLPS_250.88.ld
 
 SRC_DIRS := $(shell find src -type d)
 ASM_DIRS := $(shell find asm -type d -not -path "asm/nonmatchings*")
@@ -75,7 +77,7 @@ diff-init: all
 
 extract:
 	$(RM) -r asm/$(VERSION) bin/$(VERSION)
-	$(SPLAT) SLUS_203.12.yaml $(SPLAT_FLAGS)
+	$(SPLAT) SLPS_250.88.yaml $(SPLAT_FLAGS)
 
 init:
 	$(MAKE) distclean
@@ -85,9 +87,16 @@ init:
 	$(MAKE) diff-init
 
 #TODO better padding than hard-coded end address
-setup:
-	$(MAKE) -C tools
-	$(OBJCOPY) -O binary --gap-fill=0x00 --pad-to 0x56A300 SLUS_203.12 SLUS_203.12.rom
+setup: venv
+	#$(MAKE) -C tools
+	$(OBJCOPY) -O binary --gap-fill=0x00 --pad-to 0x56A300 SLPS_250.88 SLPS_250.88.rom
+
+venv:
+# Create the virtual environment if it doesn't exist.
+# Delete the virtual environment directory if creation fails.
+	test -d $(VENV) || python3 -m venv $(VENV) || { rm -rf $(VENV); false; }
+	$(PYTHON) -m pip install -U pip
+	$(PYTHON) -m pip install -U -r requirements.txt
 
 #### Main commands ####
 
@@ -101,7 +110,8 @@ libclean:
 
 distclean: clean
 	$(RM) -r $(BUILD_DIR) asm/ assets/ files/ .splat/
-	$(MAKE) -C tools distclean
+#	$(MAKE) -C tools distclean
+
 
 .PHONY: all rom clean libclean diff-init extract init distclean setup
 

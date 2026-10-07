@@ -1,0 +1,95 @@
+# name: Your game name here!
+#sha1: d53afe7b98625a3812b22a134ac84280b2246cb1
+options:
+  basename: SLPS_250.88
+  target_path: SLPS_250.88.rom
+  elf_path: build/SLPS_250.88.elf
+  base_path: .
+  platform: ps2
+  compiler: EEGCC
+
+  gp_value: 0x005841F0
+  ld_gp_expression: cod_LIT4_START + 0x7FF0
+
+  # asm_path: asm
+  # src_path: src
+  # build_path: build
+
+  ld_script_path: SLPS_250.88.ld
+  ld_dependencies: True
+  ld_wildcard_sections: True
+  ld_bss_contains_common: True
+  ld_align_section_vram_end: False
+  create_asm_dependencies: True
+
+  find_file_boundaries: False
+
+  o_as_suffix: True
+
+  symbol_addrs_path:
+    - symbol_addrs.txt
+  reloc_addrs_path:
+    - reloc_addrs.txt
+
+  # undefined_funcs_auto_path: undefined_funcs_auto.txt
+  # undefined_syms_auto_path: undefined_syms_auto.txt
+
+  extensions_path: tools/splat_ext
+
+  string_encoding: ASCII
+  data_string_encoding: ASCII
+  rodata_string_guesser_level: 2
+  data_string_guesser_level: 2
+
+  named_regs_for_c_funcs: False
+
+  subalign: 0x8
+
+  section_order:
+    - .text
+    - .data
+    - .rodata
+    - .vutext
+    - .lit4
+    - .sdata
+    - .sbss
+    - .bss
+
+  auto_link_sections:
+    - .data
+    - .rodata
+    - .lit4
+    - .sdata
+    - .sbss
+    - .bss
+
+segments:
+  - name: cod
+    type: code
+    start: 0x000000
+    vram: 0x00100000
+    bss_size: 0x2187AC
+    subsegments:
+      - [0x000000, asm, 000000]
+      #- [0x01b9a0, c, test]
+      - [0x01BA20, c, main/mem]
+      #- [0x01d1f0, c, main/mem2]
+      - [0x01d708, asm, 01D708]
+      - [0x200180, data, 200180]
+      - [0x468B00, rodata, 468B00]
+      - [0x469760, .rodata, main/mem]
+      - [0x469940, rodata, 469940]
+      #- [0x4505c8, .rodata, main/mem2]
+      - [0x478980, vutext, vutext]
+      - [0x47C200, lit4, 47C200]
+      #- [0x46A280, sdata, 46A280]
+  - name: zerofill
+    type: code
+    start: 0x47C68C
+    vram: 0x0057C700
+    bss_size: 0x2187E8
+    subsegments:
+      - { type: sbss, vram: 0x0057C700, name: 0057C700 }
+      - { type: bss,  vram: 0x0057C780, name: 0057C780 }
+  - [0x47C68C]
+  - [0x47C68C]

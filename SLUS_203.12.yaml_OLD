@@ -1,5 +1,5 @@
 # name: Your game name here!
-sha1: 8821b1c8b448006b744c05b818e391ac75fa9e4d
+sha1: d53afe7b98625a3812b22a134ac84280b2246cb1
 options:
   basename: SLUS_203.12
   target_path: SLUS_203.12.rom

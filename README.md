@@ -1,5 +1,5 @@
 # Final Fantasy X Decompilation
-This is a work-in-progress decompilation of Final Fantasy X. This targets the US edition of FFX, `SLUS-20312`.
+This is a work-in-progress decompilation of Final Fantasy X International . This targets the JPN edition of FFX International, `SLPS-25088`.
 
 ---
 
@@ -12,7 +12,7 @@ A `mips-linux-gnu` binutils toolchain is also required.
 
 ### Setup
 
-1. Extract the ELF file (`SLUS_203.12`) from the ISO of the game and place it in the root of the repo.
+1. Extract the ELF file (`SLPS_250.88`) from the ISO of the game and place it in the root of the repo.
 2. Run `make init`. This does, as follows:
     - Cleans the existing directory
     - Builds any tool dependencies
