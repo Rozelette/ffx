@@ -26,6 +26,8 @@ options:
 
   o_as_suffix: True
 
+  make_full_disasm_for_code: True
+
   symbol_addrs_path:
     - symbol_addrs.txt
   reloc_addrs_path:
