@@ -1,0 +1,4 @@
+sprintf = 0x002EFC98; // type:func
+memset = 0x002EED60; // type:func
+strlen = 0x002F04D0; // type:func
+strncpy = 0x002F08A0; // type:func
