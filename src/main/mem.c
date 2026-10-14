@@ -10,9 +10,9 @@
 
 #define BLOCK_SIZE(block) (((uintptr_t)block->next - (uintptr_t)block) - sizeof(MemControlBlock))
 
-extern s8 D_00565DF0;
-extern intptr_t D_00580490;
-extern MemDebugInfo D_00569758;
+extern s8 D_00565DF0; // global
+extern intptr_t sMemSavedRa; // static BSS
+const char D_00569758[] = ""; // static ROData (Empty string)
 extern MemControlBlock* D_00580454;
 extern s8 D_00580494;
 extern MemControlBlock* D_00580498;
@@ -22,7 +22,7 @@ extern int D_00580440;
 extern s32 D_00307BD8;
 
 void func_0011C950(s32, MemControlBlock*, MemControlBlock*, MemControlBlock*);
-void func_0011BFE0(void*);
+void Mem_SaveRA(void*);
 void func_0011CB08(MemControlBlock*, s32);
 void func_0011CB30(Heap*);
 
@@ -152,8 +152,8 @@ void func_0011BD08(void* arg0) {
     if (arg0 != 0) {
         void* ra;
         GetRa(&ra);
-        func_0011BFE0(ra);
-        temp_16->unkC.bits2.b = D_00580490;
+        Mem_SaveRA(ra);
+        temp_16->unkC.bits2.b = sMemSavedRa;
     }
 }
 
@@ -166,7 +166,7 @@ void func_0011BD80(s8 arg0) {
     D_00580495 = arg0;
 }
 
-extern Heap D_00580448[3];
+extern Heap sHeaps[3];
 
 void func_0011BD90(u32 arg0, intptr_t arg1, intptr_t arg2) {
     Heap* heap;
@@ -177,7 +177,7 @@ void func_0011BD90(u32 arg0, intptr_t arg1, intptr_t arg2) {
     arg1 &= 0xFFFFFFFC;
     arg2 &= 0xFFFFFFFC;
 
-    heap = &D_00580448[arg0];
+    heap = &sHeaps[arg0];
 
     top = (MemControlBlock*)arg1;
     end = (MemControlBlock*)((intptr_t)arg2 - sizeof(MemControlBlock));
@@ -209,8 +209,8 @@ void func_0011BD90(u32 arg0, intptr_t arg1, intptr_t arg2) {
 
 void func_0011BE48(void) {
     D_00580440 = 0;
-    D_00580448[0].active = 0;
-    D_00580448[1].active = 0;
+    sHeaps[0].active = 0;
+    sHeaps[1].active = 0;
     func_0011BD70(1);
     func_0011BD80(0);
 
@@ -221,7 +221,7 @@ void func_0011BE48(void) {
     } else {
         func_0011BD90(0, 0xA00000, 0x01B00000);
     }
-    func_0011CDC0(D_00580448->top);
+    func_0011CDC0(sHeaps->top);
 }
 
 ptrdiff_t func_0011BEE0(void* arg0) {
@@ -267,49 +267,49 @@ void func_0011BF50(Heap* heap) {
 }
 
 void func_0011BFD0(void) {
-    func_0011BF50(D_00580448);
+    func_0011BF50(sHeaps);
 }
 
-void func_0011BFE0(void* ra) {
-    D_00580490 = ((intptr_t)(ra - 8) >> 2) & 0x7FFFFF;
+void Mem_SaveRA(void* ra) {
+    sMemSavedRa = ((intptr_t)(ra - 8) >> 2) & 0x7FFFFF;
 }
 
 // Validate node?
-s32 func_0011C000(MemControlBlock* arg0) {
+s32 func_0011C000(MemControlBlock* mcb) {
     Heap* heap;
     MemControlBlock* top;
     MemControlBlock* end;
     intptr_t next;
 
-    heap = &D_00580448[arg0->unkC.bits2.heapIdx];
+    heap = &sHeaps[mcb->unkC.bits2.heapIdx];
     top = heap->top;
-    if ((intptr_t)top > (intptr_t)arg0)
+    if ((intptr_t)top > (intptr_t)mcb)
         return -1;
 
     end = heap->end;
 
-    if ((intptr_t)end < (intptr_t)arg0)
+    if ((intptr_t)end < (intptr_t)mcb)
         return -2;
 
-    next = (intptr_t)arg0->next;
+    next = (intptr_t)mcb->next;
     if (next < (intptr_t)top)
-        if (arg0->unkC.bits2.a != 0xF)
+        if (mcb->unkC.bits2.a != 0xF)
             return -3;
 
     if ((intptr_t)end < next)
         return -4;
 
-    if ((intptr_t)arg0->prev < (intptr_t)top && arg0->prev != 0)
+    if ((intptr_t)mcb->prev < (intptr_t)top && mcb->prev != 0)
         return -5;
 
-    if ((intptr_t)end < (intptr_t)arg0->prev)
+    if ((intptr_t)end < (intptr_t)mcb->prev)
         return -6;
 
     return 0;
 }
 
 s32 func_0011C0B0(void* ptr) {
-    Heap* heap = &D_00580448[0];
+    Heap* heap = &sHeaps[0];
 
     if (ptr == 0)
         return 0;
@@ -330,7 +330,7 @@ void func_0011C100(MemControlBlock* arg0) {
 
 void func_0011C140(MemControlBlock* arg0, char* arg1, s32 arg2) {
     func_0011CB08(arg0, 0);
-    func_0011CB30(&D_00580448[arg0->unkC.bits2.heapIdx]);
+    func_0011CB30(&sHeaps[arg0->unkC.bits2.heapIdx]);
 }
 
 u16 func_0011C188(MemControlBlock* mcb) {
@@ -353,7 +353,7 @@ void func_0011C1D8(Heap* heap) {
             if ((cur->unkC.bits2.c) && (cur->unk8.bits.b0 != func_0011C188(cur))) {
                 func_0011CB08(cur, 0);
                 func_00103828();
-                func_0011CB30(&D_00580448[cur->unkC.bits2.heapIdx]);
+                func_0011CB30(&sHeaps[cur->unkC.bits2.heapIdx]);
                 func_0011CB08(cur, 0);
                 func_00179058(0, "SgMemCheckHeap", "Memory CheckSum Error");
             }
@@ -362,7 +362,7 @@ void func_0011C1D8(Heap* heap) {
                 if (func_0011C000(next) != 0) {
                     func_0011CB08(cur, 0);
                     func_00103828();
-                    func_0011CB30(&D_00580448[cur->unkC.bits2.heapIdx]);
+                    func_0011CB30(&sHeaps[cur->unkC.bits2.heapIdx]);
                     func_0011CB08(cur, 0);
                     func_00179058(0, "SgMemCheckHeap", "Memory Brocken");
                 }
@@ -372,7 +372,7 @@ void func_0011C1D8(Heap* heap) {
 }
 
 void func_0011C328(s32 heapIdx, char* f, int l) {
-    func_0011C1D8(&D_00580448[heapIdx]);
+    func_0011C1D8(&sHeaps[heapIdx]);
 }
 
 void func_0011C340(void) {
@@ -513,18 +513,17 @@ found:
 }
 #else
 INCLUDE_ASM("asm/nonmatchings/main/mem", func_0011C358);
-void* func_0011C358(s32 arg0, s32 arg1, s32 arg2, s32 arg3, char* arg4);
 #endif
 
 
-void* func_0011C6E0(s32 arg0, s32 arg1, void* ptr, u32 size) {
+void* func_0011C6E0(s32 heapIdx, s32 arg1, void* ptr, u32 size) {
     void* newBlock;
     u32 aligned;
     u32 blockSize;
     MemControlBlock* mcb;
 
     if (ptr == NULL) {
-        return func_0011C358(0, arg0, 0xE, size, NULL);
+        return func_0011C358(0, heapIdx, 0xE, size, NULL);
     }
     mcb = (MemControlBlock*)ptr - 1;
     size += 0xF;
@@ -538,7 +537,7 @@ void* func_0011C6E0(s32 arg0, s32 arg1, void* ptr, u32 size) {
         func_0011C950(mcb->unkC.bits2.heapIdx, (MemControlBlock*)((char*)(mcb + 1) + aligned), mcb, mcb->next);
         return ptr;
     }
-    newBlock = func_0011C358(0, arg0, mcb->unkC.bits2.a, aligned, NULL);
+    newBlock = func_0011C358(0, heapIdx, mcb->unkC.bits2.a, aligned, NULL);
     func_002EEBAC(newBlock, ptr, blockSize);
     func_0011CA28(ptr, mcb->unkC.bits2.a);
     return newBlock;
@@ -593,7 +592,7 @@ MemControlBlock* func_0011C8B8(MemControlBlock* mcb) {
 }
 
 void func_0011C950(s32 heapIdx, MemControlBlock* curBlock, MemControlBlock* prev, MemControlBlock* next) {
-    Heap* heap = &D_00580448[heapIdx];
+    Heap* heap = &sHeaps[heapIdx];
 
     memset(curBlock, 0, sizeof(MemControlBlock));
     curBlock->next = next;
@@ -614,18 +613,18 @@ s32 func_0011CA08(void* arg0) {
     return mcb->unkC.bits2.a == 0;
 }
 
-void func_0011CA28(void* arg0, s32 arg1) {
+void func_0011CA28(void* ptr, s32 type) {
     MemControlBlock* mcb;
 
-    mcb = arg0 - sizeof(MemControlBlock);
-    if (arg0 != NULL) {
+    mcb = ptr - sizeof(MemControlBlock);
+    if (ptr != NULL) {
         if (mcb->unkC.bits2.a == 0) {
             func_0011C140(mcb, "this ptr is already free.", 0);
         }
-        if ((mcb->unkC.bits2.a != arg1) && (mcb->unkC.bits2.a != 0xE) && (arg1 != -1)) {
+        if ((mcb->unkC.bits2.a != type) && (mcb->unkC.bits2.a != 0xE) && (type != -1)) {
             func_0011C140(mcb, "memory owner is differrent", 0);
         }
-        func_0011BA60(arg0);
+        func_0011BA60(ptr);
         func_0011C838(mcb);
     }
 }
@@ -637,18 +636,18 @@ void func_0011CAE0(void* ptr, s32 arg1) {
     }
 }
 
-void func_0011CB08(MemControlBlock* arg0, s32 arg1) {
-    if ((arg0->unkC.bits2.a != 0) && (arg0->unkC.bits2.a != 0xF)) {
-        func_0011BAB8(arg0 + 1);
+void func_0011CB08(MemControlBlock* mcb, s32 arg1) {
+    if ((mcb->unkC.bits2.a != 0) && (mcb->unkC.bits2.a != 0xF)) {
+        func_0011BAB8(mcb + 1);
     }
 }
 
-void func_0011CB30(Heap* arg0) {
-    MemControlBlock* node = arg0->top;
+void func_0011CB30(Heap* heap) {
+    MemControlBlock* node = heap->top;
     s32 i;
 
-    if (arg0->hasFreedNodes) {
-        func_0011BF50(arg0);
+    if (heap->hasFreedNodes) {
+        func_0011BF50(heap);
     }
     for (i = 0; node != NULL; i++, node = node->next) {
         if (BLOCK_SIZE(node) >= 0x40 || node->unkC.bits2.a) {
@@ -660,13 +659,13 @@ void func_0011CB30(Heap* arg0) {
 void func_0011CBB8(s32 heapIdx) {
     switch (heapIdx) {
         case 1:
-            func_0011CB30(&D_00580448[1]);
+            func_0011CB30(&sHeaps[1]);
             break;
         case 2:
-            func_0011CB30(&D_00580448[2]);
+            func_0011CB30(&sHeaps[2]);
             break;
         default:
-            func_0011CB30(&D_00580448[0]);
+            func_0011CB30(&sHeaps[0]);
             break;
     }
 
@@ -678,7 +677,7 @@ void* func_0011CC18(void* arg0) {
     MemControlBlock* cur;
 
     block = arg0 - sizeof(MemControlBlock);
-    for (cur = D_00580448->end; cur != block; cur = cur->prev) {
+    for (cur = sHeaps->end; cur != block; cur = cur->prev) {
         if (cur->unkC.bits2.a == 0 && BLOCK_SIZE(cur) > BLOCK_SIZE(block)) {
             return cur + 1;
         }
@@ -816,7 +815,7 @@ void func_0011CFE0(s32 arg0, s32 a) {
 }
 
 s32 func_0011D008(s32* sizes) {
-    MemControlBlock* cur = D_00580448[0].top;
+    MemControlBlock* cur = sHeaps[0].top;
     s32 i;
     s32 kind = 0;
 
@@ -874,7 +873,7 @@ s32 func_0011D008(s32* sizes) {
             sizes[kind] += (uintptr_t)cur->next - (uintptr_t)cur;
         }
     }
-    return D_00580448[0].size + sizeof(MemControlBlock);
+    return sHeaps[0].size + sizeof(MemControlBlock);
 }
 
 u32 func_0011D178(s32 arg0) {

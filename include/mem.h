@@ -46,7 +46,7 @@ typedef struct MemDebugInfo {
 
 void func_0011BB08(void* ptr, char* file, int line);
 void func_0011CA28(void*, int);
-void* func_0011C358(int arg0, int arg1, int arg2, int arg3, char* arg4);
+void* func_0011C358(s32 fromEnd, s32 heapIdx, s32 type, s32 size, s8* name);
 void* func_0011C6E0(int arg0, int arg1, void* ptr, unsigned int size);
 void func_0011CA28(void*, s32);
 

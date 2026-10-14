@@ -2,3 +2,10 @@ sprintf = 0x002EFC98; // type:func
 memset = 0x002EED60; // type:func
 strlen = 0x002F04D0; // type:func
 strncpy = 0x002F08A0; // type:func
+// mem.c
+Mem_SaveRA = 0x0011BFE0; // type:func
+sHeaps = 0x00580448; // type:Heap
+sMemSavedRa =  0x00580490; // type:s32
+
+// mem2.c
+sMem2SavedRA = 0x0058049C; // type:s32
