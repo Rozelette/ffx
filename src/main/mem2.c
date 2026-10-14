@@ -10,7 +10,7 @@ static void foo() {
 void* Mem_SaveRA(void*);
 int func_002EEED0(const char* fmt, ...); // Printf
 
-MemControlBlock* func_0011D230(s32 size, s32 alignPlus1, s32 alignLess1, MemDebugInfo* arg3, s32 arg4) {
+MemControlBlock* func_0011D230(s32 size, s32 alignPlus1, s32 alignLess1, MemDebugInfo* arg3, s32 line) {
     void* newBlock;
     MemControlBlock* ptr;
     void* ra;
@@ -38,7 +38,7 @@ MemControlBlock* func_0011D230(s32 size, s32 alignPlus1, s32 alignLess1, MemDebu
         func_002EEED0("result=%x", ptr);
         func_002EEED0("\n");
     }
-    func_0011BB08(ptr, arg3->name, arg4);
+    func_0011BB08(ptr, arg3->name, line);
     return ptr;
 }
 

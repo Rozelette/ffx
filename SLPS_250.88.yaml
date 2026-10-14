@@ -60,8 +60,6 @@ options:
     - .rodata
     - .lit4
     - .sdata
-    - .sbss
-    - .bss
 
 segments:
   - name: cod
@@ -76,9 +74,11 @@ segments:
       - [0x01d230, c, main/mem2]
       - [0x01d718, asm, 01D718]
       - [0x200180, data, 200180]
-      - [0x468B00, rodata, 468B00]
-      - [0x469758, .rodata, main/mem]
-      - [0x469940, rodata, 469940]
+      - [0x207BD8, .data, main/mem]
+      - [0x207C20, data, 207C20]
+      - [0x4696E0, .rodata, main/mem]
+      - [0x469950, rodata, 469950]
+      - [0x469950, rodata, 469950]
       - [0x478980, vutext, vutext]
       - [0x47C200, lit4, 47C200]
       #- [0x46A280, sdata, 46A280]
@@ -87,8 +87,11 @@ segments:
     start: 0x47C68C
     vram: 0x0057C700
     bss_size: 0x2187E8
+    subalign: 4
     subsegments:
       - { type: sbss, vram: 0x0057C700, name: 0057C700 }
       - { type: bss,  vram: 0x0057C780, name: 0057C780 }
+      - { type: .bss,  vram: 0x00580440, name: main/mem }
+      - { type: bss,  vram: 0x0058049C, name: 0058049C }
   - [0x47C68C]
   - [0x47C68C]

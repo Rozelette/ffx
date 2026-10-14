@@ -9,7 +9,7 @@ typedef struct MemControlBlock_t {
     /* 0x04 */ struct MemControlBlock_t* prev;
     /* 0x08 */ union { // TODO bitset or int?
         struct {
-            unsigned int b0 : 16;
+            unsigned int checkSum : 16;
             unsigned int debugIndex : 11;
             unsigned int b27 : 5;
         } bits;
@@ -18,8 +18,8 @@ typedef struct MemControlBlock_t {
     /* 0x0C */ union {
         struct {
             unsigned int a : 4;
-            unsigned int b : 22;
-            unsigned int c : 1;
+            unsigned int ra : 22;
+            unsigned int readOnly : 1;
             unsigned int heapIdx : 2;
             unsigned int e : 3;
         } bits2;
