@@ -1,3 +1,15 @@
+// Heap allocator ("SgMem" in the game's own error strings).
+//
+// Every allocation starts with a 0x10 byte MemControlBlock header. Headers form a doubly linked list in
+// address order, and a block runs up to the next header. Each heap starts with a free block and ends with
+// a MEM_OWNER_END sentinel. Free blocks are not merged when freed. Freeing sets heap->hasFreedNodes, and
+// the next allocation merges neighbours with Mem_MergeFreeBlocks.
+//
+// Heap 0 is the main heap. Heap 1 is a debug heap that only exists when D_00565DF0 (debug mode) is set.
+// sHeaps has room for three heaps, but Mem_Init only sets up two.
+//
+// The public wrappers (Mem_Alloc, Mem_Free, malloc, ...) are in mem2.c.
+
 #include "common.h"
 #include "mem.h"
 
@@ -5,36 +17,47 @@
 #define MEM_DEBUG_INFO ((MemDebugInfo*)0x05FB0000)
 #define MEM_DEBUG_INFO_COUNT 0x800
 
-// MemControlBlock.unk8 bits holding the block's MEM_DEBUG_INFO index
+// MemControlBlock.info bits holding the block's MEM_DEBUG_INFO index
 #define MCB_DEBUG_INDEX_MASK 0x07FF0000
 
+// Usable size of a block, not counting its header
 #define BLOCK_SIZE(block) (((uintptr_t)block->next - (uintptr_t)block) - sizeof(MemControlBlock))
 
-extern s8 D_00565DF0; 
+extern s8 D_00565DF0; // Debug mode flag
 
+// When set, the next failed allocation returns NULL instead of reporting the failure and retrying.
+// Cleared by every allocation.
 static s32 sDebugFailedAlloc = 0;
-static char* D_00307BE0[] = {
+
+// Four character names for each owner ID, indexed by MemControlBlock.attr.bits.owner. 0 is "----" for
+// free blocks. 14 (MEM_OWNER_ANY) and 15 (MEM_OWNER_END) are blank. The rest look like developer name
+// abbreviations. Nothing in the retail build reads this table, so it was probably used by the stripped
+// printing in Mem_PrintBlock.
+static char* sMemOwnerNames[] = {
     "----", "aka ", "ega ", "toni", "yoni", "kata", "masa", "sugi",
     "nari", "hase", "thas", "sasa", "yana", "ishi", "    ", "    ",
 };
 
-static const char D_00569758[] = "";
+static const char sEmptyDebugName[] = "";
 
-static s32 sMemCurAlign;
+static s32 sMemCurAlign; // Alignment mask for the next forward allocation, see Mem_SetAlignment
 static Heap sHeaps[3];
-static intptr_t sMemSavedRa;
-static s8 D_00580494; // Only set
-static s8 D_00580495; // Only set
-static MemControlBlock* D_00580498;
+static intptr_t sMemSavedRa; // Packed return address stored into the next block's attr.bits.ra
+static s8 D_00580494;        // Only set, never read in the retail build
+static s8 D_00580495;        // Only set, never read in the retail build
+static MemControlBlock* sCompactCursor; // Where Mem_CompactBlock starts looking for free space
 
-void func_0011C950(s32, MemControlBlock*, MemControlBlock*, MemControlBlock*);
+void Mem_InsertFreeBlock(s32, MemControlBlock*, MemControlBlock*, MemControlBlock*);
 void Mem_SaveRA(void*);
-void func_0011CB08(MemControlBlock*, s32);
-void func_0011CB30(Heap*);
+void Mem_PrintBlock(MemControlBlock*, s32);
+void Mem_DumpHeap(Heap*);
 
-void func_0011CDC0(void*);
+void Mem_SetCompactCursor(void*);
 
-extern void* func_002EEC5C(void*, void*, int);
+// libc
+void* memcpy(void* dst, const void* src, unsigned int size);
+void* memmove(void* dst, const void* src, unsigned int size);
+// Dumps the resource cache (src/main 0x110CE0, not split yet)
 extern void func_00110CE0(char*);
 
 void Mem_ClearDbgArea(void) {
@@ -52,47 +75,49 @@ void Mem_ClearDbgArea(void) {
     }
 }
 
-void func_0011BA60(void* arg0) {
+// Releases the block's MEM_DEBUG_INFO slot
+void Mem_ClearDebugName(void* ptr) {
     MemControlBlock* mcb;
 
-    mcb = arg0 - sizeof(MemControlBlock);
-    if ((D_00565DF0 != 0) && (arg0 != NULL)) {
-        if (mcb->unk8.raw & MCB_DEBUG_INDEX_MASK) {
-            MEM_DEBUG_INFO[(mcb->unk8.raw >> 16) & 0x7FF].name[0] = 0;
-            mcb->unk8.raw = (u32)(mcb->unk8.raw & ~MCB_DEBUG_INDEX_MASK);
+    mcb = ptr - sizeof(MemControlBlock);
+    if ((D_00565DF0 != 0) && (ptr != NULL)) {
+        if (mcb->info.raw & MCB_DEBUG_INDEX_MASK) {
+            MEM_DEBUG_INFO[(mcb->info.raw >> 16) & 0x7FF].name[0] = 0;
+            mcb->info.raw = (u32)(mcb->info.raw & ~MCB_DEBUG_INDEX_MASK);
         }
     }
 }
 
-
-MemDebugInfo* func_0011BAB8(void* ptr) {
+// Returns the block's "file:line" name, or an empty string if it has none
+MemDebugInfo* Mem_GetDebugName(void* ptr) {
     MemControlBlock* mcb = ptr - sizeof(MemControlBlock);
     MemDebugInfo* arr = MEM_DEBUG_INFO;
 
     if (D_00565DF0 == 0) {
-        return (MemDebugInfo*)&D_00569758;
+        return (MemDebugInfo*)&sEmptyDebugName;
     }
 
     if (ptr == NULL) {
-        return (MemDebugInfo*)&D_00569758;
+        return (MemDebugInfo*)&sEmptyDebugName;
     }
 
-    if ((mcb->unk8.raw & MCB_DEBUG_INDEX_MASK) == 0) {
-        return (MemDebugInfo*)&D_00569758;
+    if ((mcb->info.raw & MCB_DEBUG_INDEX_MASK) == 0) {
+        return (MemDebugInfo*)&sEmptyDebugName;
     }
-    return &arr[(mcb->unk8.raw >> 16) & 0x7FF];
+    return &arr[(mcb->info.raw >> 16) & 0x7FF];
 }
 
+// libc
 int sprintf(char* str, const char* fmt, ...);
 void* memset(void*, s32, s32);
 int strlen(char*);
 int strncpy(char*, char*, int);
-void* memmove(void* dst, const void* src, unsigned int size);
-// printf
-int func_002EEED0(const char* fmt, ...);
+int printf(const char* fmt, ...);
 
-// Insert debug string
-void func_0011BB08(void* ptr, char* file, int line) {
+// Stores "file:line" in a MEM_DEBUG_INFO slot for the block. File names that are too long keep their end
+// and get a '*' as the first character. Reuses the block's slot if it already has one, otherwise takes
+// the first empty slot (slot 0 is never used).
+void Mem_SetDebugName(void* ptr, char* file, int line) {
     MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
     MemDebugInfo* info = MEM_DEBUG_INFO;
     int index = 0;
@@ -128,12 +153,12 @@ void func_0011BB08(void* ptr, char* file, int line) {
             sprintf(name, "%s", lineStr);
         }
 
-        if (mcb->unk8.raw & MCB_DEBUG_INDEX_MASK) {
-            memset((void*)(((mcb->unk8.raw >> 16) & 0x7FF) * sizeof(MemDebugInfo) + (u32)info), 0,
+        if (mcb->info.raw & MCB_DEBUG_INDEX_MASK) {
+            memset((void*)(((mcb->info.raw >> 16) & 0x7FF) * sizeof(MemDebugInfo) + (u32)info), 0,
                    sizeof(MemDebugInfo));
-            strncpy(info[mcb->unk8.bits.debugIndex].name, name, sizeof(info->name) - 1);
-            info[mcb->unk8.bits.debugIndex].name[sizeof(info->name) - 1] = '\0';
-            index = (mcb->unk8.raw >> 16) & 0x7FF;
+            strncpy(info[mcb->info.bits.debugIndex].name, name, sizeof(info->name) - 1);
+            info[mcb->info.bits.debugIndex].name[sizeof(info->name) - 1] = '\0';
+            index = (mcb->info.raw >> 16) & 0x7FF;
         } else {
             i = 1;
             do {
@@ -149,17 +174,17 @@ void func_0011BB08(void* ptr, char* file, int line) {
         }
     }
 
-    mcb->unk8.bits.debugIndex = index;
+    mcb->info.bits.debugIndex = index;
 }
 
-
+// Records the caller of the caller as the block's allocation site
 void Mem_SetBlockRA(void* ptr) {
     MemControlBlock* mcb = ptr - sizeof(MemControlBlock);
     if (ptr != 0) {
         void* ra;
         GetRa(&ra);
         Mem_SaveRA(ra);
-        mcb->unkC.bits2.ra = sMemSavedRa;
+        mcb->attr.bits.ra = sMemSavedRa;
     }
 }
 
@@ -171,6 +196,7 @@ void func_0011BD80(s8 arg0) {
     D_00580495 = arg0;
 }
 
+// Sets up a heap as one free block followed by the end sentinel
 void Mem_InitHeap(u32 heapIdx, intptr_t heapTop, intptr_t heapEnd) {
     Heap* heap;
     MemControlBlock* end;
@@ -194,23 +220,23 @@ void Mem_InitHeap(u32 heapIdx, intptr_t heapTop, intptr_t heapEnd) {
 
     top->next = end;
     top->prev = 0;
-    top->unkC.bits2.a = 0;
-    top->unkC.bits2.heapIdx = heapIdx;
+    top->attr.bits.owner = MEM_OWNER_FREE;
+    top->attr.bits.heapIdx = heapIdx;
 
     end_3 = heap->end;
 
     *(u_long128*)end_3 = 0;
     end_3->prev = (MemControlBlock*)top;
     end_3->next = NULL;
-    end_3->unkC.bits2.a = 0xF;
-    end_3->unkC.bits2.heapIdx = heapIdx;
+    end_3->attr.bits.owner = MEM_OWNER_END;
+    end_3->attr.bits.heapIdx = heapIdx;
     heap->active = 1;
     heap->hasFreedNodes = 0;
     heap->nextFree = heap->top;
 }
 
-
-void func_0011BE48(void) {
+// Main heap: 0x00A00000-0x01B00000. Debug heap (debug mode only): 0x03000000-0x05D00000.
+void Mem_Init(void) {
     sMemCurAlign = 0;
     sHeaps[0].active = 0;
     sHeaps[1].active = 0;
@@ -224,10 +250,11 @@ void func_0011BE48(void) {
     } else {
         Mem_InitHeap(0, 0xA00000, 0x01B00000);
     }
-    func_0011CDC0(sHeaps->top);
+    Mem_SetCompactCursor(sHeaps->top);
 }
 
-ptrdiff_t func_0011BEE0(void* arg0) {
+// Usable size of an allocation
+ptrdiff_t Mem_GetSize(void* arg0) {
     MemControlBlock* mcb;
     if (arg0 == NULL) {
         return 0;
@@ -238,7 +265,7 @@ ptrdiff_t func_0011BEE0(void* arg0) {
 
 void Mem_ClearBlock(MemControlBlock* mcb, s32 val) {
     s32* quads;
-    s32 numQuads = BLOCK_SIZE(mcb) / sizeof(s32) * 4;
+    s32 numQuads = BLOCK_SIZE(mcb) / (sizeof(s32) * 4);
     quads = (s32*)(mcb + 1);
     numQuads--;
     while (numQuads != -1) {
@@ -255,12 +282,12 @@ void Mem_SetDebugFailedAlloc(s32 flag) {
     sDebugFailedAlloc = flag;
 }
 
-void func_0011BF50(Heap* heap) {
+void Mem_MergeFreeBlocks(Heap* heap) {
     MemControlBlock* curr;
 
     // Merge runs of free blocks and relink prev pointers
-    for (curr = heap->top; curr->unkC.bits2.a != 0xF; curr = curr->next) {
-        while (curr->unkC.bits2.a == 0 && curr->next->unkC.bits2.a == 0) {
+    for (curr = heap->top; curr->attr.bits.owner != MEM_OWNER_END; curr = curr->next) {
+        while (curr->attr.bits.owner == MEM_OWNER_FREE && curr->next->attr.bits.owner == MEM_OWNER_FREE) {
             curr->next = curr->next->next;
         }
         curr->next->prev = curr;
@@ -269,22 +296,23 @@ void func_0011BF50(Heap* heap) {
     heap->hasFreedNodes = 0;
 }
 
-void func_0011BFD0(void) {
-    func_0011BF50(sHeaps);
+void Mem_MergeFreeBlocksMain(void) {
+    Mem_MergeFreeBlocks(sHeaps);
 }
 
+// Packs a return address into the 22 bit attr.bits.ra format: the word address of the jal
 void Mem_SaveRA(void* ra) {
     sMemSavedRa = ((intptr_t)(ra - 8) >> 2) & 0x7FFFFF;
 }
 
-// Validate node?
-s32 func_0011C000(MemControlBlock* mcb) {
+// Returns 0 if the header and its links lie inside its heap, otherwise a negative error code
+s32 Mem_ValidateBlock(MemControlBlock* mcb) {
     Heap* heap;
     MemControlBlock* top;
     MemControlBlock* end;
     intptr_t next;
 
-    heap = &sHeaps[mcb->unkC.bits2.heapIdx];
+    heap = &sHeaps[mcb->attr.bits.heapIdx];
     top = heap->top;
     if ((intptr_t)top > (intptr_t)mcb)
         return -1;
@@ -296,7 +324,7 @@ s32 func_0011C000(MemControlBlock* mcb) {
 
     next = (intptr_t)mcb->next;
     if (next < (intptr_t)top)
-        if (mcb->unkC.bits2.a != 0xF)
+        if (mcb->attr.bits.owner != MEM_OWNER_END)
             return -3;
 
     if ((intptr_t)end < next)
@@ -311,7 +339,8 @@ s32 func_0011C000(MemControlBlock* mcb) {
     return 0;
 }
 
-s32 func_0011C0B0(void* ptr) {
+// Same as Mem_ValidateBlock for a user pointer, with -10 / -20 for pointers outside the main heap
+s32 Mem_ValidatePtr(void* ptr) {
     Heap* heap = &sHeaps[0];
 
     if (ptr == 0)
@@ -321,19 +350,21 @@ s32 func_0011C0B0(void* ptr) {
     else if ((intptr_t)ptr > (intptr_t)heap->end)
         return -20;
     else
-        return func_0011C000((MemControlBlock*)ptr - 1);
+        return Mem_ValidateBlock((MemControlBlock*)ptr - 1);
 }
 
-void func_0011C100(MemControlBlock* arg0) {
-    s32 ret = func_0011C000(arg0);
+void Mem_CheckMCB(MemControlBlock* arg0) {
+    s32 ret = Mem_ValidateBlock(arg0);
     if (ret != 0) {
+        // func_00179058(0, title, fmt, ...) reports an error (not split yet)
         func_00179058(0, "SG:MemCheckMCBerr", "the MCB broken maybe.code=%d\n", ret);
     }
 }
 
-void func_0011C140(MemControlBlock* arg0, char* arg1, s32 arg2) {
-    func_0011CB08(arg0, 0);
-    func_0011CB30(&sHeaps[arg0->unkC.bits2.heapIdx]);
+// Error report for a bad block. The message was printed by code that is stripped from the retail build.
+void Mem_ReportBadBlock(MemControlBlock* arg0, char* msg, s32 arg2) {
+    Mem_PrintBlock(arg0, 0);
+    Mem_DumpHeap(&sHeaps[arg0->attr.bits.heapIdx]);
 }
 
 u16 Mem_CalcBlockChecksum(MemControlBlock* mcb) {
@@ -347,26 +378,27 @@ u16 Mem_CalcBlockChecksum(MemControlBlock* mcb) {
     return sum;
 }
 
-void func_0011C1D8(Heap* heap) {
+// Walks the heap, checking read-only blocks' checksums and every header's links
+void Mem_CheckHeapImpl(Heap* heap) {
     MemControlBlock* next;
     MemControlBlock* cur = heap->top;
 
     if (heap->active) {
         for (; cur != NULL; cur = cur->next) {
-            if ((cur->unkC.bits2.readOnly) && (cur->unk8.bits.checkSum != Mem_CalcBlockChecksum(cur))) {
-                func_0011CB08(cur, 0);
+            if ((cur->attr.bits.readOnly) && (cur->info.bits.checkSum != Mem_CalcBlockChecksum(cur))) {
+                Mem_PrintBlock(cur, 0);
                 func_00103828();
-                func_0011CB30(&sHeaps[cur->unkC.bits2.heapIdx]);
-                func_0011CB08(cur, 0);
+                Mem_DumpHeap(&sHeaps[cur->attr.bits.heapIdx]);
+                Mem_PrintBlock(cur, 0);
                 func_00179058(0, "SgMemCheckHeap", "Memory CheckSum Error");
             }
             next = cur->next;
             if (next != NULL) {
-                if (func_0011C000(next) != 0) {
-                    func_0011CB08(cur, 0);
+                if (Mem_ValidateBlock(next) != 0) {
+                    Mem_PrintBlock(cur, 0);
                     func_00103828();
-                    func_0011CB30(&sHeaps[cur->unkC.bits2.heapIdx]);
-                    func_0011CB08(cur, 0);
+                    Mem_DumpHeap(&sHeaps[cur->attr.bits.heapIdx]);
+                    Mem_PrintBlock(cur, 0);
                     func_00179058(0, "SgMemCheckHeap", "Memory Brocken");
                 }
             }
@@ -374,19 +406,28 @@ void func_0011C1D8(Heap* heap) {
     }
 }
 
-void func_0011C328(s32 heapIdx, char* f, int l) {
-    func_0011C1D8(&sHeaps[heapIdx]);
+// Callers pass __FILE__ and __LINE__, which the retail build ignores
+void Mem_CheckHeap(s32 heapIdx, char* f, int l) {
+    Mem_CheckHeapImpl(&sHeaps[heapIdx]);
 }
 
+// Empty in the retail build
 void func_0011C340(void) {
 }
 
+// Sets the alignment (a power of two) for the next forward allocation. Each allocation resets it.
 void Mem_SetAlignment(int align) {
     sMemCurAlign = align - 1;
 }
 
+// Core allocator. Searches forward from heap->nextFree, or backward from the end when fromEnd is set, for
+// the first free block that fits, then splits it. Forward allocations honour sMemCurAlign by splitting off
+// a free padding block first. On failure in heap 0 it asks the resource cache to release memory and
+// retries. If that doesn't help it prints the failure and hits a breakpoint (unless sDebugFailedAlloc is
+// set, which makes it return NULL).
+// name is only used in the failure message.
 #ifdef NON_MATCHING
-void* func_0011C358(s32 fromEnd, s32 heapIdx, s32 type, s32 size, s8* name) {
+void* Mem_AllocBlock(s32 fromEnd, s32 heapIdx, s32 owner, s32 size, s8* name) {
     s32 alignedPlusHdr;
     s32 sp10;
     Heap* heap;
@@ -403,19 +444,19 @@ void* func_0011C358(s32 fromEnd, s32 heapIdx, s32 type, s32 size, s8* name) {
     printedName = name;
     sp10 = size + 0xF;
 masterRetry:
-    heap = &D_00580448[heapIdx];
+    heap = &sHeaps[heapIdx];
     headerSize = sizeof(MemControlBlock);
     if (printedName == NULL) {
-        printedName = &D_00569758.name[0];
+        printedName = (s8*)sEmptyDebugName;
     }
     if (heap->hasFreedNodes != 0) {
-        func_0011BF50(heap);
+        Mem_MergeFreeBlocks(heap);
     }
     aligned = sp10 & 0xFFFFFFF0;
     if (fromEnd != 0) {
         cur = heap->end;
         while (1) {
-            while (cur->unkC.bits2.a != 0) {
+            while (cur->attr.bits.owner != MEM_OWNER_FREE) {
                 cur = cur->prev;
                 if (cur == NULL) {
                     goto fail;
@@ -442,13 +483,13 @@ masterRetry:
         alignedPlusHdr = aligned + 0x10;
         while (1) {
             s32 align;
-            while (cur->unkC.bits2.a != 0) {
+            while (cur->attr.bits.owner != MEM_OWNER_FREE) {
                 cur = cur->next;
                 if (cur == NULL)
                     goto fail;
             }
             next = cur->next;
-            align = D_00580440;
+            align = sMemCurAlign;
             pad = 0;
             blockSize = BLOCK_SIZE(cur);
             if (align != 0) {
@@ -479,20 +520,21 @@ masterRetry:
                 newBlock->next = cur->next;
                 newBlock->prev = cur;
                 cur->next = newBlock;
-                newBlock->unkC.bits2.heapIdx = heapIdx;
-                newBlock->unkC.bits2.a = 0;
+                newBlock->attr.bits.heapIdx = heapIdx;
+                newBlock->attr.bits.owner = MEM_OWNER_FREE;
                 goto found;
             }
             cur = next;
         }
     }
 fail:
-    if (D_00307BD8 != 0) {
-        D_00580440 = 0;
-        D_00307BD8 = 0;
+    if (sDebugFailedAlloc != 0) {
+        sMemCurAlign = 0;
+        sDebugFailedAlloc = 0;
         return NULL;
     }
     if (heapIdx == 0) {
+        // Release cached resources and retry
         if (func_00103628() != 0) {
             goto masterRetry;
         }
@@ -500,73 +542,78 @@ fail:
             goto masterRetry;
         }
     }
-    func_00120108("%sMemory Not Enough\nfile=%s\nFunction [%s + %xh]\nsize=%d(%xh)\n", heapIdx ? "Debug " : D_00569758.name,
-                  printedName, func_0011A330(D_00580490 << 2), (D_00580490 << 2) - func_0011A3C8(),
+    // func_0011A330 / func_0011A3C8 look up the name and start address of the function containing an address
+    func_00120108("%sMemory Not Enough\nfile=%s\nFunction [%s + %xh]\nsize=%d(%xh)\n", heapIdx ? "Debug " : sEmptyDebugName,
+                  printedName, func_0011A330(sMemSavedRa << 2), (sMemSavedRa << 2) - func_0011A3C8(),
                   aligned, aligned);
     Break();
     goto masterRetry;
 found:
-    cur->unkC.bits2.a = type;
-    cur->unkC.bits2.ra = D_00580490;
-    cur->unkC.bits2.heapIdx = heapIdx;
-    cur->unkC.bits2.c = 0;
-    D_00580440 = 0;
-    D_00307BD8 = 0;
+    cur->attr.bits.owner = owner;
+    cur->attr.bits.ra = sMemSavedRa;
+    cur->attr.bits.heapIdx = heapIdx;
+    cur->attr.bits.readOnly = 0;
+    sMemCurAlign = 0;
+    sDebugFailedAlloc = 0;
     return cur + 1;
 }
 #else
-INCLUDE_ASM("asm/nonmatchings/main/mem", func_0011C358);
+INCLUDE_ASM("asm/nonmatchings/main/mem", Mem_AllocBlock);
 #endif
 
-
-void* func_0011C6E0(s32 heapIdx, s32 arg1, void* ptr, u32 size) {
+// Resizes an allocation. Shrinking frees the tail in place. Growing allocates a new block with the old
+// block's owner, copies the data and frees the old block. A NULL ptr allocates a new MEM_OWNER_ANY block.
+// owner is unused.
+void* Mem_ReallocBlock(s32 heapIdx, s32 owner, void* ptr, u32 size) {
     void* newBlock;
     u32 aligned;
     u32 blockSize;
     MemControlBlock* mcb;
 
     if (ptr == NULL) {
-        return func_0011C358(0, heapIdx, 0xE, size, NULL);
+        return Mem_AllocBlock(0, heapIdx, MEM_OWNER_ANY, size, NULL);
     }
     mcb = (MemControlBlock*)ptr - 1;
     size += 0xF;
     aligned = size & ~0xF;
-    func_0011C100(mcb);
+    Mem_CheckMCB(mcb);
     blockSize = BLOCK_SIZE(mcb);
     if (blockSize == aligned) {
         return ptr;
     }
     if (aligned < blockSize) {
-        func_0011C950(mcb->unkC.bits2.heapIdx, (MemControlBlock*)((char*)(mcb + 1) + aligned), mcb, mcb->next);
+        Mem_InsertFreeBlock(mcb->attr.bits.heapIdx, (MemControlBlock*)((char*)(mcb + 1) + aligned), mcb, mcb->next);
         return ptr;
     }
-    newBlock = func_0011C358(0, heapIdx, mcb->unkC.bits2.a, aligned, NULL);
-    func_002EEBAC(newBlock, ptr, blockSize);
-    func_0011CA28(ptr, mcb->unkC.bits2.a);
+    newBlock = Mem_AllocBlock(0, heapIdx, mcb->attr.bits.owner, aligned, NULL);
+    memcpy(newBlock, ptr, blockSize);
+    Mem_FreeBlock(ptr, mcb->attr.bits.owner);
     return newBlock;
 }
 
+// Marks a block read-only and stores its checksum, which Mem_CheckHeapImpl verifies
 void Mem_SetBlockReadOnly(void* ptr, s32 readOnly) {
     MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
 
-    mcb->unkC.bits2.readOnly = readOnly;
+    mcb->attr.bits.readOnly = readOnly;
     if (readOnly != 0) {
-        mcb->unk8.bits.checkSum = Mem_CalcBlockChecksum(mcb);
+        mcb->info.bits.checkSum = Mem_CalcBlockChecksum(mcb);
     }
 }
 
+// Clears the header's attributes, marking the block free. Merging happens later in Mem_MergeFreeBlocks.
 // Load reorderings/regalloc
 #ifdef NON_MATCHING
-void func_0011C838(MemControlBlock* mcb) {
-    Heap* heap = &D_00580448[mcb->unkC.bits2.heapIdx];
+void Mem_MarkFree(MemControlBlock* mcb) {
+    Heap* heap = &sHeaps[mcb->attr.bits.heapIdx];
 
-    mcb->unk8.bits.debugIndex = 0;
-    mcb->unk8.bits.b27 = 0;
-    mcb->unkC.bits2.a = 0;
-    mcb->unkC.bits2.ra = 0;
-    mcb->unkC.bits2.c = 0;
-    mcb->unkC.bits2.e = 0;
-    mcb->unk8.bits.b0 = 0;
+    mcb->info.bits.debugIndex = 0;
+    mcb->info.bits.subType = 0;
+    mcb->attr.bits.owner = MEM_OWNER_FREE;
+    mcb->attr.bits.ra = 0;
+    mcb->attr.bits.readOnly = 0;
+    mcb->attr.bits.unk29 = 0;
+    mcb->info.bits.checkSum = 0;
 
     if ((u32)mcb < (u32)heap->nextFree) {
         heap->nextFree = mcb;
@@ -574,121 +621,135 @@ void func_0011C838(MemControlBlock* mcb) {
     heap->hasFreedNodes = 1;
 }
 #else
-void func_0011C838(MemControlBlock* mcb);
-INCLUDE_ASM("asm/nonmatchings/main/mem", func_0011C838);
+void Mem_MarkFree(MemControlBlock* mcb);
+INCLUDE_ASM("asm/nonmatchings/main/mem", Mem_MarkFree);
 #endif
 
-MemControlBlock* func_0011C8B8(MemControlBlock* mcb) {
+// Merges a free block with the free blocks around it and returns the merged block
+MemControlBlock* Mem_MergeFreeNeighbours(MemControlBlock* mcb) {
     MemControlBlock* prev;
 
-    if (mcb->unkC.bits2.a != 0) {
+    if (mcb->attr.bits.owner != MEM_OWNER_FREE) {
         return mcb;
     }
-    for (prev = mcb->prev; prev->unkC.bits2.a == 0; prev = mcb->prev) {
+    for (prev = mcb->prev; prev->attr.bits.owner == MEM_OWNER_FREE; prev = mcb->prev) {
         mcb = prev;
     }
-    while (mcb->unkC.bits2.a == 0 && mcb->next->unkC.bits2.a == 0) {
+    while (mcb->attr.bits.owner == MEM_OWNER_FREE && mcb->next->attr.bits.owner == MEM_OWNER_FREE) {
         mcb->next = mcb->next->next;
     }
     mcb->next->prev = mcb;
     return mcb;
 }
 
-void func_0011C950(s32 heapIdx, MemControlBlock* curBlock, MemControlBlock* prev, MemControlBlock* next) {
+// Writes a new free header at curBlock between prev and next, then merges it with its neighbours
+void Mem_InsertFreeBlock(s32 heapIdx, MemControlBlock* curBlock, MemControlBlock* prev, MemControlBlock* next) {
     Heap* heap = &sHeaps[heapIdx];
 
     memset(curBlock, 0, sizeof(MemControlBlock));
     curBlock->next = next;
     curBlock->prev = prev;
-    curBlock->unkC.bits2.heapIdx = heapIdx;
+    curBlock->attr.bits.heapIdx = heapIdx;
     prev->next = curBlock;
     curBlock->next->prev = (MemControlBlock*)curBlock;
-    func_0011C838(curBlock);
-    func_0011C8B8(curBlock);
+    Mem_MarkFree(curBlock);
+    Mem_MergeFreeNeighbours(curBlock);
     heap->hasFreedNodes = 0;
 }
 
-s32 func_0011CA08(void* arg0) {
+s32 Mem_IsFree(void* arg0) {
     MemControlBlock* mcb = (MemControlBlock*)(arg0 - sizeof(MemControlBlock));
     if (arg0 == NULL) {
         return NULL;
     }
-    return mcb->unkC.bits2.a == 0;
+    return mcb->attr.bits.owner == MEM_OWNER_FREE;
 }
 
-void func_0011CA28(void* ptr, s32 type) {
+// Frees an allocation. The owner must match the block's, unless the block is MEM_OWNER_ANY or owner is -1.
+// Double frees and owner mismatches are reported, and the block is freed anyway.
+void Mem_FreeBlock(void* ptr, s32 owner) {
     MemControlBlock* mcb;
 
     mcb = ptr - sizeof(MemControlBlock);
     if (ptr != NULL) {
-        if (mcb->unkC.bits2.a == 0) {
-            func_0011C140(mcb, "this ptr is already free.", 0);
+        if (mcb->attr.bits.owner == MEM_OWNER_FREE) {
+            Mem_ReportBadBlock(mcb, "this ptr is already free.", 0);
         }
-        if ((mcb->unkC.bits2.a != type) && (mcb->unkC.bits2.a != 0xE) && (type != -1)) {
-            func_0011C140(mcb, "memory owner is differrent", 0);
+        if ((mcb->attr.bits.owner != owner) && (mcb->attr.bits.owner != MEM_OWNER_ANY) && (owner != -1)) {
+            Mem_ReportBadBlock(mcb, "memory owner is differrent", 0);
         }
-        func_0011BA60(ptr);
-        func_0011C838(mcb);
+        Mem_ClearDebugName(ptr);
+        Mem_MarkFree(mcb);
     }
 }
 
-void func_0011CAE0(void* ptr, s32 arg1) {
+// Debug mode only. func_0011F190 (Sg_PcWrite) writes a buffer to "host0:<fileName>" on the dev PC.
+void Mem_WriteToHost(void* ptr, char* fileName) {
     if (D_00565DF0 != 0) {
         MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
-        func_0011F190(ptr, (uintptr_t)mcb->next - (uintptr_t)ptr, arg1);
+        func_0011F190(ptr, (uintptr_t)mcb->next - (uintptr_t)ptr, fileName);
     }
 }
 
-void func_0011CB08(MemControlBlock* mcb, s32 arg1) {
-    if ((mcb->unkC.bits2.a != 0) && (mcb->unkC.bits2.a != 0xF)) {
-        func_0011BAB8(mcb + 1);
+// The printing was stripped from the retail build. Only the name lookup is left.
+void Mem_PrintBlock(MemControlBlock* mcb, s32 index) {
+    if ((mcb->attr.bits.owner != MEM_OWNER_FREE) && (mcb->attr.bits.owner != MEM_OWNER_END)) {
+        Mem_GetDebugName(mcb + 1);
     }
 }
 
-void func_0011CB30(Heap* heap) {
+// Prints every allocated block and every free block of 0x40 bytes or more
+void Mem_DumpHeap(Heap* heap) {
     MemControlBlock* node = heap->top;
     s32 i;
 
     if (heap->hasFreedNodes) {
-        func_0011BF50(heap);
+        Mem_MergeFreeBlocks(heap);
     }
     for (i = 0; node != NULL; i++, node = node->next) {
-        if (BLOCK_SIZE(node) >= 0x40 || node->unkC.bits2.a) {
-            func_0011CB08(node, i);
+        if (BLOCK_SIZE(node) >= 0x40 || node->attr.bits.owner) {
+            Mem_PrintBlock(node, i);
         }
     }
 }
 
-void func_0011CBB8(s32 heapIdx) {
+void Mem_Dump(s32 heapIdx) {
     switch (heapIdx) {
         case 1:
-            func_0011CB30(&sHeaps[1]);
+            Mem_DumpHeap(&sHeaps[1]);
             break;
         case 2:
-            func_0011CB30(&sHeaps[2]);
+            Mem_DumpHeap(&sHeaps[2]);
             break;
         default:
-            func_0011CB30(&sHeaps[0]);
+            Mem_DumpHeap(&sHeaps[0]);
             break;
     }
 
     func_00110CE0("Cache Dump");
 }
 
-void* func_0011CC18(void* arg0) {
+// The functions below move blocks around to defragment the main heap. Callers have to update their own
+// pointers to the moved data.
+
+// Searches the main heap downward from the end for a free block bigger than ptr's block.
+// Returns that free block's data pointer, or NULL if there is none above ptr.
+void* Mem_FindFreeBlockAbove(void* arg0) {
     MemControlBlock* block;
     MemControlBlock* cur;
 
     block = arg0 - sizeof(MemControlBlock);
     for (cur = sHeaps->end; cur != block; cur = cur->prev) {
-        if (cur->unkC.bits2.a == 0 && BLOCK_SIZE(cur) > BLOCK_SIZE(block)) {
+        if (cur->attr.bits.owner == MEM_OWNER_FREE && BLOCK_SIZE(cur) > BLOCK_SIZE(block)) {
             return cur + 1;
         }
     }
     return NULL;
 }
 
-void* func_0011CC78(void* ptr) {
+// If the next block is free, moves this block to the top of it. Returns the new data pointer, or ptr if
+// the block did not move.
+void* Mem_SlideUp(void* ptr) {
     MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
     MemControlBlock* next = mcb->next;
     MemControlBlock* newBlock;
@@ -696,28 +757,30 @@ void* func_0011CC78(void* ptr) {
     void* newPtr;
     u32 size;
 
-    if (next->unkC.bits2.a != 0) {
+    if (next->attr.bits.owner != MEM_OWNER_FREE) {
         return ptr;
     }
     size = BLOCK_SIZE(mcb);
     next = next->next;
     newPtr = (char*)next - size;
     newBlock = (MemControlBlock*)newPtr - 1;
-    func_002EEC5C(newBlock, mcb, size + sizeof(MemControlBlock));
+    memmove(newBlock, mcb, size + sizeof(MemControlBlock));
     newBlock->next = next;
     newBlock->prev = mcb;
     mcb->next = newBlock;
     next->prev = newBlock;
     prev = mcb->prev;
-    if (prev->unkC.bits2.a == 0) {
+    if (prev->attr.bits.owner == MEM_OWNER_FREE) {
         prev->next = mcb->next;
     } else {
-        func_0011C838(mcb);
+        Mem_MarkFree(mcb);
     }
     return newBlock + 1;
 }
 
-void* func_0011CD30(void* freePtr, void* ptr) {
+// Moves ptr's block to the top of the free block freePtr (from Mem_FindFreeBlockAbove) and frees the old
+// block. Returns the new data pointer.
+void* Mem_MoveIntoFreeBlock(void* freePtr, void* ptr) {
     MemControlBlock* freeBlock = (MemControlBlock*)freePtr - 1;
     MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
     MemControlBlock* newBlock;
@@ -726,8 +789,8 @@ void* func_0011CD30(void* freePtr, void* ptr) {
 
     freePtr = (char*)freePtr + (freeLen - len - sizeof(MemControlBlock));
     newBlock = freePtr;
-    func_002EEC5C(newBlock, mcb, len);
-    func_0011C838(mcb);
+    memmove(newBlock, mcb, len);
+    Mem_MarkFree(mcb);
     newBlock->next = freeBlock->next;
     freeBlock->next->prev = newBlock;
     freeBlock->next = newBlock;
@@ -735,18 +798,22 @@ void* func_0011CD30(void* freePtr, void* ptr) {
     return newBlock + 1;
 }
 
-void func_0011CDC0(void* arg0) {
+// NULL resets the cursor to the start of the main heap
+void Mem_SetCompactCursor(void* arg0) {
     if (arg0 != NULL) {
-        D_00580498 = arg0 - sizeof(MemControlBlock);
+        sCompactCursor = arg0 - sizeof(MemControlBlock);
         return;
     }
-    D_00580498 = sHeaps[0].top;
+    sCompactCursor = sHeaps[0].top;
 }
 
+// Moves *handle's block to a lower address: into the first big enough free block between sCompactCursor
+// and the block, or else down into the free block directly below it. Updates *handle, adds the size to
+// *movedBytes if given, and returns how far the data moved (0 if it didn't).
 #ifdef NON_MATCHING
-s32 func_0011CDE8(void** handle, u32* movedBytes) {
+s32 Mem_CompactBlock(void** handle, u32* movedBytes) {
     void* ptr = *handle;
-    MemControlBlock* cur = D_00580498;
+    MemControlBlock* cur = sCompactCursor;
     s32 rv;
     MemControlBlock* mcb;
     MemControlBlock* next;
@@ -763,18 +830,18 @@ s32 func_0011CDE8(void** handle, u32* movedBytes) {
     sizeWithHdr = size + sizeof(MemControlBlock);
 
     // Look for an earlier free block big enough to hold this one
-    for (; cur->unkC.bits2.a != 0xF && (intptr_t)cur < (intptr_t)mcb->prev; cur = cur->next) {
-        if (cur->unkC.bits2.a == 0 && size < BLOCK_SIZE(cur)) {
+    for (; cur->attr.bits.owner != MEM_OWNER_END && (intptr_t)cur < (intptr_t)mcb->prev; cur = cur->next) {
+        if (cur->attr.bits.owner == MEM_OWNER_FREE && size < BLOCK_SIZE(cur)) {
             next = cur->next;
             savedPrev = cur->prev;
-            func_002EEC5C(cur, mcb, sizeWithHdr);
+            memmove(cur, mcb, sizeWithHdr);
             *handle = cur + 1;
-            func_0011C838(mcb);
+            Mem_MarkFree(mcb);
             split = (MemControlBlock*)((char*)cur + sizeWithHdr);
             cur->prev = savedPrev;
             cur->next = split;
-            func_0011C950(0, split, cur, next);
-            func_0011C8B8(mcb);
+            Mem_InsertFreeBlock(0, split, cur, next);
+            Mem_MergeFreeNeighbours(mcb);
             rv = (char*)*handle - (char*)ptr;
             if (movedBytes != NULL) {
                 *movedBytes += size;
@@ -784,11 +851,11 @@ s32 func_0011CDE8(void** handle, u32* movedBytes) {
     }
 
     // Otherwise slide down into the free block directly before it
-    if (mcb->prev->unkC.bits2.a != 0) {
+    if (mcb->prev->attr.bits.owner != MEM_OWNER_FREE) {
         return 0;
     }
     sizeWithHdr = size + sizeof(MemControlBlock);
-    cur = func_0011C8B8(mcb->prev);
+    cur = Mem_MergeFreeNeighbours(mcb->prev);
     next = mcb->next;
     savedPrev = cur->prev;
     memmove(cur, mcb, sizeWithHdr);
@@ -796,7 +863,7 @@ s32 func_0011CDE8(void** handle, u32* movedBytes) {
     cur->prev = savedPrev;
     *handle = cur + 1;
     cur->next = split;
-    func_0011C950(0, split, cur, next);
+    Mem_InsertFreeBlock(0, split, cur, next);
     rv = (char*)*handle - (char*)ptr;
     if (movedBytes != NULL) {
         *movedBytes += size;
@@ -804,34 +871,37 @@ s32 func_0011CDE8(void** handle, u32* movedBytes) {
     return rv;
 }
 #else
-INCLUDE_ASM("asm/nonmatchings/main/mem", func_0011CDE8);
+INCLUDE_ASM("asm/nonmatchings/main/mem", Mem_CompactBlock);
 #endif
 
-void func_0011CFB8(void* arg0, s32 b27) {
+void Mem_SetSubType(void* arg0, s32 subType) {
     MemControlBlock* mcb = (MemControlBlock*)arg0 - 1;
-    mcb->unk8.bits.b27 = b27;
+    mcb->info.bits.subType = subType;
 }
 
-void func_0011CFE0(s32 arg0, s32 a) {
+// Takes the owner minus one, like Mem_Alloc
+void Mem_SetOwner(s32 arg0, s32 ownerLess1) {
     MemControlBlock* mcb = (MemControlBlock*)arg0 - 1;
-    mcb->unkC.bits2.a = a + 1;
+    mcb->attr.bits.owner = ownerLess1 + 1;
 }
 
-s32 func_0011D008(s32* sizes) {
+// Adds up the main heap's block sizes (headers included) into nine categories by owner, and by subType
+// for owner 7. Free blocks go in sizes[7]. Returns the heap size.
+s32 Mem_GetUsage(s32* sizes) {
     MemControlBlock* cur = sHeaps[0].top;
     s32 i;
     s32 kind = 0;
 
-    func_0011C328(0, "src/main/mem.c", 1071);
+    Mem_CheckHeap(0, "src/main/mem.c", 1071);
     for (i = 8; i >= 0; i--) {
         sizes[i] = 0;
     }
     for (; cur != NULL; cur = cur->next) {
-        switch (cur->unkC.bits2.a) {
-            case 15:
+        switch (cur->attr.bits.owner) {
+            case MEM_OWNER_END:
                 kind = -1;
                 break;
-            case 0:
+            case MEM_OWNER_FREE:
                 kind = 7;
                 break;
             case 13:
@@ -841,7 +911,7 @@ s32 func_0011D008(s32* sizes) {
                 kind = 1;
                 break;
             case 7:
-                switch (cur->unk8.bits.b27) {
+                switch (cur->info.bits.subType) {
                     case 1:
                         kind = 4;
                         break;
@@ -879,23 +949,25 @@ s32 func_0011D008(s32* sizes) {
     return sHeaps[0].size + sizeof(MemControlBlock);
 }
 
-u32 func_0011D178(s32 arg0) {
+// Returns the largest free block in the main heap. Mode 1 merges free blocks first. Mode 2 first releases
+// everything the resource cache can give back.
+u32 Mem_GetLargestFree(s32 mode) {
     MemControlBlock* cur;
     u32 curBlockSize;
     u32 maxBlockSize;
 
     cur = sHeaps[0].top;
     maxBlockSize = 0;
-    if (arg0 == 1) {
-        func_0011BFD0();
-    } else if (arg0 == 2) {
+    if (mode == 1) {
+        Mem_MergeFreeBlocksMain();
+    } else if (mode == 2) {
         while (func_00103628() != 0)
             ;
         while (func_00110D70() == 0)
             ;
     }
     for (; cur != NULL; cur = cur->next) {
-        if (cur->unkC.bits2.a == 0) {
+        if (cur->attr.bits.owner == MEM_OWNER_FREE) {
             curBlockSize = BLOCK_SIZE(cur);
             maxBlockSize = (maxBlockSize < curBlockSize) ? curBlockSize : maxBlockSize;
         }

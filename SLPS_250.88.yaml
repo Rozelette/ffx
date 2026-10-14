@@ -42,7 +42,7 @@ options:
   data_string_guesser_level: 2
 
   named_regs_for_c_funcs: False
-
+  mips_abi_gpr: numeric
   subalign: 0x8
 
   section_order:
@@ -76,8 +76,8 @@ segments:
       - [0x200180, data, 200180]
       - [0x207BD8, .data, main/mem]
       - [0x207C20, data, 207C20]
+      - [0x468B00, rodata, 468B00]
       - [0x4696E0, .rodata, main/mem]
-      - [0x469950, rodata, 469950]
       - [0x469950, rodata, 469950]
       - [0x478980, vutext, vutext]
       - [0x47C200, lit4, 47C200]
