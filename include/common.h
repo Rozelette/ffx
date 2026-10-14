@@ -23,6 +23,10 @@ typedef volatile u16 vu16;
 typedef volatile u32 vu32;
 typedef volatile u64 vu64;
 
+typedef unsigned int uintptr_t;
+typedef int intptr_t;
+typedef int ptrdiff_t;
+
 typedef union {
     vs8 s8;
     vs16 s16;
@@ -39,8 +43,8 @@ typedef float f32;
 #define UNK_TYPE s32
 #define UNK_PTR void*
 #define UNK_RET void
-#define UNK_FUN_ARG void(*)(void)
-#define UNK_FUN_PTR(name) void(*name)(void)
+#define UNK_FUN_ARG void (*)(void)
+#define UNK_FUN_PTR(name) void (*name)(void)
 #define UNK_ARGS
 
 #define NULL 0
@@ -51,10 +55,10 @@ typedef float f32;
 #define ARRAY_COUNT(arr) (s32)(sizeof(arr) / sizeof(arr[0]))
 #define ARRAY_COUNTU(arr) (u32)(sizeof(arr) / sizeof(arr[0]))
 
-#define BSS __attribute__ ((section (".bss")))
+#define BSS __attribute__((section(".bss")))
 
-//#include "common_data.h"
-//#include "common_funcs.h"
-//#include "common_math.h"
+// #include "common_data.h"
+// #include "common_funcs.h"
+// #include "common_math.h"
 
 #endif /* COMMON_H */
