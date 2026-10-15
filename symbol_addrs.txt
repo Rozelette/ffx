@@ -78,4 +78,5 @@ Mem_StrDupDebug = 0x0011D640; // type:func
 Mem_Malloc = 0x0011D678; // type:func
 Mem_FreeAny = 0x0011D6C8; // type:func
 Mem_StrDup = 0x0011D6D0; // type:func
+Mem_ReallocOwnerD = 0x0011D718; // type:func
 sMem2SavedRA = 0x0058049C; // type:s32

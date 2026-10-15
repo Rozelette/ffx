@@ -72,7 +72,7 @@ segments:
       #- [0x01b9a0, c, test]
       - [0x01BA20, c, main/mem]
       - [0x01d230, c, main/mem2]
-      - [0x01d718, asm, 01D718]
+      - [0x01d740, asm, 01D740]
       - [0x200180, data, 200180]
       - [0x207BD8, .data, main/mem]
       - [0x207C20, data, 207C20]

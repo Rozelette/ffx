@@ -147,3 +147,7 @@ void Mem_FreeAny(void* ptr) {
 void* Mem_StrDup(char* arg0) {
     return strcpy(Mem_Alloc(strlen(arg0) + 1, MEM_OWNER_ANY - 1, "src/main/mem2.c", 0x99), arg0);
 }
+
+void* Mem_ReallocOwnerD(void* ptr, s32 size) {
+    return Mem_ReallocBlock(0, 0xD, ptr, size);
+}
