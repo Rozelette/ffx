@@ -23,6 +23,9 @@
 // Usable size of a block, not counting its header
 #define BLOCK_SIZE(block) (((uintptr_t)block->next - (uintptr_t)block) - sizeof(MemControlBlock))
 
+#define PTR_TO_BLOCK(ptr) ((MemControlBlock*)ptr - 1)
+#define BLOCK_TO_PTR(block) ((void*)(block + 1))
+
 extern s8 D_00565DF0; // Debug mode flag
 
 // When set, the next failed allocation returns NULL instead of reporting the failure and retrying.
@@ -79,7 +82,7 @@ void Mem_ClearDbgArea(void) {
 void Mem_ClearDebugName(void* ptr) {
     MemControlBlock* mcb;
 
-    mcb = ptr - sizeof(MemControlBlock);
+    mcb = PTR_TO_BLOCK(ptr);
     if ((D_00565DF0 != 0) && (ptr != NULL)) {
         if (mcb->info.raw & MCB_DEBUG_INDEX_MASK) {
             MEM_DEBUG_INFO[(mcb->info.raw >> 16) & 0x7FF].name[0] = 0;
@@ -90,7 +93,7 @@ void Mem_ClearDebugName(void* ptr) {
 
 // Returns the block's "file:line" name, or an empty string if it has none
 MemDebugInfo* Mem_GetDebugName(void* ptr) {
-    MemControlBlock* mcb = ptr - sizeof(MemControlBlock);
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
     MemDebugInfo* arr = MEM_DEBUG_INFO;
 
     if (D_00565DF0 == 0) {
@@ -118,7 +121,7 @@ int printf(const char* fmt, ...);
 // and get a '*' as the first character. Reuses the block's slot if it already has one, otherwise takes
 // the first empty slot (slot 0 is never used).
 void Mem_SetDebugName(void* ptr, char* file, int line) {
-    MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
     MemDebugInfo* info = MEM_DEBUG_INFO;
     int index = 0;
     char name[0x30];
@@ -179,7 +182,7 @@ void Mem_SetDebugName(void* ptr, char* file, int line) {
 
 // Records the caller of the caller as the block's allocation site
 void Mem_SetBlockRA(void* ptr) {
-    MemControlBlock* mcb = ptr - sizeof(MemControlBlock);
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
     if (ptr != 0) {
         void* ra;
         GetRa(&ra);
@@ -254,19 +257,20 @@ void Mem_Init(void) {
 }
 
 // Usable size of an allocation
-ptrdiff_t Mem_GetSize(void* arg0) {
+ptrdiff_t Mem_GetSize(void* ptr) {
     MemControlBlock* mcb;
-    if (arg0 == NULL) {
+
+    if (ptr == NULL) {
         return 0;
     }
-    mcb = (MemControlBlock*)arg0 - 1;
-    return (ptrdiff_t)mcb->next - (ptrdiff_t)arg0;
+    mcb = PTR_TO_BLOCK(ptr);
+    return (ptrdiff_t)mcb->next - (ptrdiff_t)ptr;
 }
 
 void Mem_ClearBlock(MemControlBlock* mcb, s32 val) {
     s32* quads;
     s32 numQuads = BLOCK_SIZE(mcb) / (sizeof(s32) * 4);
-    quads = (s32*)(mcb + 1);
+    quads = (s32*)BLOCK_TO_PTR(mcb);
     numQuads--;
     while (numQuads != -1) {
         quads[3] = val;
@@ -350,11 +354,11 @@ s32 Mem_ValidatePtr(void* ptr) {
     else if ((intptr_t)ptr > (intptr_t)heap->end)
         return -20;
     else
-        return Mem_ValidateBlock((MemControlBlock*)ptr - 1);
+        return Mem_ValidateBlock(PTR_TO_BLOCK(ptr));
 }
 
-void Mem_CheckMCB(MemControlBlock* arg0) {
-    s32 ret = Mem_ValidateBlock(arg0);
+void Mem_CheckMCB(MemControlBlock* mcb) {
+    s32 ret = Mem_ValidateBlock(mcb);
     if (ret != 0) {
         // func_00179058(0, title, fmt, ...) reports an error (not split yet)
         func_00179058(0, "SG:MemCheckMCBerr", "the MCB broken maybe.code=%d\n", ret);
@@ -368,7 +372,7 @@ void Mem_ReportBadBlock(MemControlBlock* arg0, char* msg, s32 arg2) {
 }
 
 u16 Mem_CalcBlockChecksum(MemControlBlock* mcb) {
-    u16* data = (u16*)(mcb + 1);
+    u16* data = (u16*)BLOCK_TO_PTR(mcb);
     ptrdiff_t count = (BLOCK_SIZE(mcb)) / sizeof(u16);
     u16 sum = 0;
 
@@ -573,7 +577,7 @@ void* Mem_ReallocBlock(s32 heapIdx, s32 owner, void* ptr, u32 size) {
     if (ptr == NULL) {
         return Mem_AllocBlock(0, heapIdx, MEM_OWNER_ANY, size, NULL);
     }
-    mcb = (MemControlBlock*)ptr - 1;
+    mcb = PTR_TO_BLOCK(ptr);
     size += 0xF;
     aligned = size & ~0xF;
     Mem_CheckMCB(mcb);
@@ -593,7 +597,7 @@ void* Mem_ReallocBlock(s32 heapIdx, s32 owner, void* ptr, u32 size) {
 
 // Marks a block read-only and stores its checksum, which Mem_CheckHeapImpl verifies
 void Mem_SetBlockReadOnly(void* ptr, s32 readOnly) {
-    MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
 
     mcb->attr.bits.readOnly = readOnly;
     if (readOnly != 0) {
@@ -657,9 +661,9 @@ void Mem_InsertFreeBlock(s32 heapIdx, MemControlBlock* curBlock, MemControlBlock
     heap->hasFreedNodes = 0;
 }
 
-s32 Mem_IsFree(void* arg0) {
-    MemControlBlock* mcb = (MemControlBlock*)(arg0 - sizeof(MemControlBlock));
-    if (arg0 == NULL) {
+s32 Mem_IsFree(void* ptr) {
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
+    if (ptr == NULL) {
         return NULL;
     }
     return mcb->attr.bits.owner == MEM_OWNER_FREE;
@@ -668,9 +672,8 @@ s32 Mem_IsFree(void* arg0) {
 // Frees an allocation. The owner must match the block's, unless the block is MEM_OWNER_ANY or owner is -1.
 // Double frees and owner mismatches are reported, and the block is freed anyway.
 void Mem_FreeBlock(void* ptr, s32 owner) {
-    MemControlBlock* mcb;
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
 
-    mcb = ptr - sizeof(MemControlBlock);
     if (ptr != NULL) {
         if (mcb->attr.bits.owner == MEM_OWNER_FREE) {
             Mem_ReportBadBlock(mcb, "this ptr is already free.", 0);
@@ -734,14 +737,14 @@ void Mem_Dump(s32 heapIdx) {
 
 // Searches the main heap downward from the end for a free block bigger than ptr's block.
 // Returns that free block's data pointer, or NULL if there is none above ptr.
-void* Mem_FindFreeBlockAbove(void* arg0) {
+void* Mem_FindFreeBlockAbove(void* ptr) {
     MemControlBlock* block;
     MemControlBlock* cur;
 
-    block = arg0 - sizeof(MemControlBlock);
+    block = PTR_TO_BLOCK(ptr);
     for (cur = sHeaps->end; cur != block; cur = cur->prev) {
         if (cur->attr.bits.owner == MEM_OWNER_FREE && BLOCK_SIZE(cur) > BLOCK_SIZE(block)) {
-            return cur + 1;
+            return BLOCK_TO_PTR(cur);
         }
     }
     return NULL;
@@ -763,7 +766,7 @@ void* Mem_SlideUp(void* ptr) {
     size = BLOCK_SIZE(mcb);
     next = next->next;
     newPtr = (char*)next - size;
-    newBlock = (MemControlBlock*)newPtr - 1;
+    newBlock = PTR_TO_BLOCK(newPtr);
     memmove(newBlock, mcb, size + sizeof(MemControlBlock));
     newBlock->next = next;
     newBlock->prev = mcb;
@@ -775,14 +778,14 @@ void* Mem_SlideUp(void* ptr) {
     } else {
         Mem_MarkFree(mcb);
     }
-    return newBlock + 1;
+    return BLOCK_TO_PTR(newBlock);
 }
 
 // Moves ptr's block to the top of the free block freePtr (from Mem_FindFreeBlockAbove) and frees the old
 // block. Returns the new data pointer.
 void* Mem_MoveIntoFreeBlock(void* freePtr, void* ptr) {
-    MemControlBlock* freeBlock = (MemControlBlock*)freePtr - 1;
-    MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
+    MemControlBlock* freeBlock = PTR_TO_BLOCK(freePtr);
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
     MemControlBlock* newBlock;
     u32 len = (uintptr_t)mcb->next - (uintptr_t)mcb;
     u32 freeLen = (uintptr_t)freeBlock->next - (uintptr_t)freeBlock;
@@ -795,13 +798,13 @@ void* Mem_MoveIntoFreeBlock(void* freePtr, void* ptr) {
     freeBlock->next->prev = newBlock;
     freeBlock->next = newBlock;
     newBlock->prev = freeBlock;
-    return newBlock + 1;
+    return BLOCK_TO_PTR(newBlock);
 }
 
 // NULL resets the cursor to the start of the main heap
-void Mem_SetCompactCursor(void* arg0) {
-    if (arg0 != NULL) {
-        sCompactCursor = arg0 - sizeof(MemControlBlock);
+void Mem_SetCompactCursor(void* ptr) {
+    if (ptr != NULL) {
+        sCompactCursor = PTR_TO_BLOCK(ptr);
         return;
     }
     sCompactCursor = sHeaps[0].top;
@@ -825,7 +828,7 @@ s32 Mem_CompactBlock(void** handle, u32* movedBytes) {
     if (ptr == NULL) {
         return 0;
     }
-    mcb = (MemControlBlock*)ptr - 1;
+    mcb = PTR_TO_BLOCK(ptr);
     size = BLOCK_SIZE(mcb);
     sizeWithHdr = size + sizeof(MemControlBlock);
 
@@ -874,14 +877,14 @@ s32 Mem_CompactBlock(void** handle, u32* movedBytes) {
 INCLUDE_ASM("asm/nonmatchings/main/mem", Mem_CompactBlock);
 #endif
 
-void Mem_SetSubType(void* arg0, s32 subType) {
-    MemControlBlock* mcb = (MemControlBlock*)arg0 - 1;
+void Mem_SetSubType(void* ptr, s32 subType) {
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
     mcb->info.bits.subType = subType;
 }
 
 // Takes the owner minus one, like Mem_Alloc
-void Mem_SetOwner(s32 arg0, s32 ownerLess1) {
-    MemControlBlock* mcb = (MemControlBlock*)arg0 - 1;
+void Mem_SetOwner(s32 ptr, s32 ownerLess1) {
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
     mcb->attr.bits.owner = ownerLess1 + 1;
 }
 
@@ -952,12 +955,10 @@ s32 Mem_GetUsage(s32* sizes) {
 // Returns the largest free block in the main heap. Mode 1 merges free blocks first. Mode 2 first releases
 // everything the resource cache can give back.
 u32 Mem_GetLargestFree(s32 mode) {
-    MemControlBlock* cur;
+    MemControlBlock* cur = sHeaps[0].top;
     u32 curBlockSize;
-    u32 maxBlockSize;
+    u32 maxBlockSize = 0;
 
-    cur = sHeaps[0].top;
-    maxBlockSize = 0;
     if (mode == 1) {
         Mem_MergeFreeBlocksMain();
     } else if (mode == 2) {

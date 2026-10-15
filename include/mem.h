@@ -16,7 +16,7 @@ typedef struct MemControlBlock_t {
     /* 0x04 */ struct MemControlBlock_t* prev;
     /* 0x08 */ union {
         struct {
-            unsigned int checkSum : 16;   // Sum of the block's halfwords, valid while readOnly is set
+            unsigned int checkSum : 16;   // Set when `readOnly` is set
             unsigned int debugIndex : 11; // Index into MEM_DEBUG_INFO, 0 when the block has no name
             unsigned int subType : 5;     // Further splits the owner 7 statistics in Mem_GetUsage
         } bits;
@@ -26,8 +26,8 @@ typedef struct MemControlBlock_t {
         struct {
             unsigned int owner : 4;    // MEM_OWNER_* or a caller's owner ID
             unsigned int ra : 22;      // Word address of the allocating call, from Mem_SaveRA
-            unsigned int readOnly : 1; // Mem_CheckHeapImpl verifies checkSum for these blocks
-            unsigned int heapIdx : 2;  // Index into sHeaps
+            unsigned int readOnly : 1; // Calculates a checksum when set. 
+            unsigned int heapIdx : 2;
             unsigned int unk29 : 3;    // Only ever cleared
         } bits;
         unsigned raw;
