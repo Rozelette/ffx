@@ -20,13 +20,13 @@ typedef unsigned int u_long128 __attribute__((mode(TI)));
 #define MEM_OWNER_SASA 0XB
 #define MEM_OWNER_YANA 0xC
 #define MEM_OWNER_ISHI 0xD
-#define MEM_OWNER_ANY 0xE  // malloc-style allocations. Freeing one skips the owner check.
-#define MEM_OWNER_END 0xF  // Sentinel block at the end of each heap
+#define MEM_OWNER_ANY 0xE // malloc-style allocations. Freeing one skips the owner check.
+#define MEM_OWNER_END 0xF // Sentinel block at the end of each heap
 
 // Allocation owners for use by the users outside the allocator
 typedef enum AllocOwner {
-    AllocOwnerAka  = MEM_OWNER_AKA  - 1,
-    AllocOwnerEga  = MEM_OWNER_EGA  - 1,
+    AllocOwnerAka = MEM_OWNER_AKA - 1,
+    AllocOwnerEga = MEM_OWNER_EGA - 1,
     AllocOwnerToni = MEM_OWNER_TONI - 1,
     AllocOwnerYoni = MEM_OWNER_YONI - 1,
     AllocOwnerKata = MEM_OWNER_KATA - 1,
@@ -70,9 +70,9 @@ typedef struct MemControlBlock_t {
         struct {
             unsigned int owner : 4;    // MEM_OWNER_* or a caller's owner ID
             unsigned int ra : 22;      // Word address of the allocating call, from Mem_SaveRA
-            unsigned int readOnly : 1; // Calculates a checksum when set. 
+            unsigned int readOnly : 1; // Calculates a checksum when set.
             unsigned int heapIdx : 2;
-            unsigned int unk29 : 3;    // Only ever cleared
+            unsigned int unk29 : 3; // Only ever cleared
         } bits;
         unsigned raw;
     } attr;
@@ -85,10 +85,10 @@ typedef struct {
     /* 0x03 */ char unk3;
     /* 0x04 */ unsigned int id;
     /* 0x08 */ unsigned int size;
-    /* 0x0C */ MemControlBlock* start;      // First block
+    /* 0x0C */ MemControlBlock* start;    // First block
     /* 0x10 */ MemControlBlock* end;      // MEM_OWNER_END sentinel block
     /* 0x14 */ MemControlBlock* nextFree; // Lowest block that may be free; forward searches start here
-} Heap; // size = 0x18
+} Heap;                                   // size = 0x18
 
 // Debug name ("file:line") for an allocation
 typedef struct MemDebugInfo {

@@ -45,9 +45,9 @@ static const char sEmptyDebugName[] = "";
 
 static s32 sMemCurAlign; // Alignment mask for the next forward allocation, see Mem_SetAlignment
 static Heap sHeaps[3];
-static intptr_t sMemSavedRa; // Packed return address stored into the next block's attr.bits.ra
-static s8 D_00580494;        // Only set, never read in the retail build
-static s8 D_00580495;        // Only set, never read in the retail build
+static intptr_t sMemSavedRa;            // Packed return address stored into the next block's attr.bits.ra
+static s8 D_00580494;                   // Only set, never read in the retail build
+static s8 D_00580495;                   // Only set, never read in the retail build
 static MemControlBlock* sCompactCursor; // Where Mem_CompactBlock starts looking for free space
 
 void Mem_InsertFreeBlock(s32, MemControlBlock*, MemControlBlock*, MemControlBlock*);
@@ -81,7 +81,7 @@ void Mem_ClearDbgArea(void) {
 // Releases the block's MEM_DEBUG_INFO slot
 void Mem_ClearDebugName(void* ptr) {
     MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
-    
+
     if ((D_00565DF0 != 0) && (ptr != NULL)) {
         if (mcb->info.raw & MCB_DEBUG_INDEX_MASK) {
             MEM_DEBUG_INFO[(mcb->info.raw >> 16) & 0x7FF].name[0] = '\0';
@@ -546,9 +546,9 @@ fail:
         }
     }
     // func_0011A330 / func_0011A3C8 look up the name and start address of the function containing an address
-    func_00120108("%sMemory Not Enough\nfile=%s\nFunction [%s + %xh]\nsize=%d(%xh)\n", heapIdx ? "Debug " : sEmptyDebugName,
-                  printedName, func_0011A330(sMemSavedRa << 2), (sMemSavedRa << 2) - func_0011A3C8(),
-                  aligned, aligned);
+    func_00120108("%sMemory Not Enough\nfile=%s\nFunction [%s + %xh]\nsize=%d(%xh)\n",
+                  heapIdx ? "Debug " : sEmptyDebugName, printedName, func_0011A330(sMemSavedRa << 2),
+                  (sMemSavedRa << 2) - func_0011A3C8(), aligned, aligned);
     Break();
     goto masterRetry;
 found:
@@ -890,15 +890,15 @@ void Mem_SetOwner(s32 ptr, s32 ownerLess1) {
 typedef enum AllocKind {
     /* -1 */ AllocSentinal = -1,
     /* 0 */ Alloc0,
-    /* 1 */Alloc1,
-    /* 2 */Alloc2,
-    /* 3 */Alloc3,
-    /* 4 */Alloc4,
-    /* 5 */Alloc5,
-    /* 6 */Alloc6,
-    /* 7 */AllocFree,
-    /* 8 */Alloc8,
-    /* 9 */Alloc9,
+    /* 1 */ Alloc1,
+    /* 2 */ Alloc2,
+    /* 3 */ Alloc3,
+    /* 4 */ Alloc4,
+    /* 5 */ Alloc5,
+    /* 6 */ Alloc6,
+    /* 7 */ AllocFree,
+    /* 8 */ Alloc8,
+    /* 9 */ Alloc9,
 } AllocKind;
 
 // Adds up the main heap's block sizes (headers included) into nine categories by owner, and by subType
