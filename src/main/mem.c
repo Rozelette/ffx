@@ -920,13 +920,13 @@ s32 Mem_GetUsage(s32 sizes[8]) {
             case MEM_OWNER_FREE:
                 kind = AllocFree;
                 break;
-            case 13:
+            case MEM_OWNER_ISHI:
                 kind = Alloc3;
                 break;
-            case 12:
+            case MEM_OWNER_YANA:
                 kind = Alloc1;
                 break;
-            case 7:
+            case MEM_OWNER_SUGI:
                 switch (cur->info.bits.subType) {
                     case 1:
                         kind = Alloc4;
@@ -948,10 +948,10 @@ s32 Mem_GetUsage(s32 sizes[8]) {
                         break;
                 }
                 break;
-            case 1:
-            case 2:
-            case 4:
-            case 9:
+            case MEM_OWNER_AKA:
+            case MEM_OWNER_EGA:
+            case MEM_OWNER_YONI:
+            case MEM_OWNER_HASE:
                 kind = Alloc2;
                 break;
             default:
