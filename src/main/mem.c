@@ -71,7 +71,7 @@ void Mem_ClearDbgArea(void) {
         next = MEM_DEBUG_INFO_COUNT - 1;
         curInfo = &MEM_DEBUG_INFO[MEM_DEBUG_INFO_COUNT - 1];
         do {
-            curInfo->name[0] = 0;
+            curInfo->name[0] = '\0';
             next = next + -1;
             curInfo--;
         } while (-1 < next);
@@ -80,12 +80,11 @@ void Mem_ClearDbgArea(void) {
 
 // Releases the block's MEM_DEBUG_INFO slot
 void Mem_ClearDebugName(void* ptr) {
-    MemControlBlock* mcb;
-
-    mcb = PTR_TO_BLOCK(ptr);
+    MemControlBlock* mcb = PTR_TO_BLOCK(ptr);
+    
     if ((D_00565DF0 != 0) && (ptr != NULL)) {
         if (mcb->info.raw & MCB_DEBUG_INDEX_MASK) {
-            MEM_DEBUG_INFO[(mcb->info.raw >> 16) & 0x7FF].name[0] = 0;
+            MEM_DEBUG_INFO[(mcb->info.raw >> 16) & 0x7FF].name[0] = '\0';
             mcb->info.raw = (u32)(mcb->info.raw & ~MCB_DEBUG_INDEX_MASK);
         }
     }
@@ -200,42 +199,42 @@ void func_0011BD80(s8 arg0) {
 }
 
 // Sets up a heap as one free block followed by the end sentinel
-void Mem_InitHeap(u32 heapIdx, intptr_t heapTop, intptr_t heapEnd) {
+void Mem_InitHeap(u32 heapIdx, intptr_t heapStart, intptr_t heapEnd) {
     Heap* heap;
     MemControlBlock* end;
     MemControlBlock* end_3;
-    MemControlBlock* top;
+    MemControlBlock* start;
 
-    heapTop &= 0xFFFFFFFC;
+    heapStart &= 0xFFFFFFFC;
     heapEnd &= 0xFFFFFFFC;
 
     heap = &sHeaps[heapIdx];
 
-    top = (MemControlBlock*)heapTop;
+    start = (MemControlBlock*)heapStart;
     end = (MemControlBlock*)((intptr_t)heapEnd - sizeof(MemControlBlock));
-    heap->size = heapEnd - heapTop;
-    heap->top = top;
+    heap->size = heapEnd - heapStart;
+    heap->start = start;
 
-    *(u_long128*)top = 0;
+    *(u_long128*)start = 0;
 
     heap->end = end;
     heap->id = heapIdx;
 
-    top->next = end;
-    top->prev = 0;
-    top->attr.bits.owner = MEM_OWNER_FREE;
-    top->attr.bits.heapIdx = heapIdx;
+    start->next = end;
+    start->prev = 0;
+    start->attr.bits.owner = MEM_OWNER_FREE;
+    start->attr.bits.heapIdx = heapIdx;
 
     end_3 = heap->end;
 
     *(u_long128*)end_3 = 0;
-    end_3->prev = (MemControlBlock*)top;
+    end_3->prev = (MemControlBlock*)start;
     end_3->next = NULL;
     end_3->attr.bits.owner = MEM_OWNER_END;
     end_3->attr.bits.heapIdx = heapIdx;
     heap->active = 1;
     heap->hasFreedNodes = 0;
-    heap->nextFree = heap->top;
+    heap->nextFree = heap->start;
 }
 
 // Main heap: 0x00A00000-0x01B00000. Debug heap (debug mode only): 0x03000000-0x05D00000.
@@ -253,7 +252,7 @@ void Mem_Init(void) {
     } else {
         Mem_InitHeap(0, 0xA00000, 0x01B00000);
     }
-    Mem_SetCompactCursor(sHeaps->top);
+    Mem_SetCompactCursor(sHeaps->start);
 }
 
 // Usable size of an allocation
@@ -290,7 +289,7 @@ void Mem_MergeFreeBlocks(Heap* heap) {
     MemControlBlock* curr;
 
     // Merge runs of free blocks and relink prev pointers
-    for (curr = heap->top; curr->attr.bits.owner != MEM_OWNER_END; curr = curr->next) {
+    for (curr = heap->start; curr->attr.bits.owner != MEM_OWNER_END; curr = curr->next) {
         while (curr->attr.bits.owner == MEM_OWNER_FREE && curr->next->attr.bits.owner == MEM_OWNER_FREE) {
             curr->next = curr->next->next;
         }
@@ -312,33 +311,33 @@ void Mem_SaveRA(void* ra) {
 // Returns 0 if the header and its links lie inside its heap, otherwise a negative error code
 s32 Mem_ValidateBlock(MemControlBlock* mcb) {
     Heap* heap;
-    MemControlBlock* top;
+    MemControlBlock* start;
     MemControlBlock* end;
     intptr_t next;
 
     heap = &sHeaps[mcb->attr.bits.heapIdx];
-    top = heap->top;
-    if ((intptr_t)top > (intptr_t)mcb)
-        return -1;
+    start = heap->start;
+    if ((intptr_t)start > (intptr_t)mcb)
+        return -E_BLOCK_UNDER_HEAP;
 
     end = heap->end;
 
     if ((intptr_t)end < (intptr_t)mcb)
-        return -2;
+        return -E_BLOCK_OVER_HEAP;
 
     next = (intptr_t)mcb->next;
-    if (next < (intptr_t)top)
+    if (next < (intptr_t)start)
         if (mcb->attr.bits.owner != MEM_OWNER_END)
             return -3;
 
     if ((intptr_t)end < next)
-        return -4;
+        return -E_NEXT_BLOCK_OVER_HEAP;
 
-    if ((intptr_t)mcb->prev < (intptr_t)top && mcb->prev != 0)
-        return -5;
+    if ((intptr_t)mcb->prev < (intptr_t)start && mcb->prev != 0)
+        return -E_PREV_BLOCK_UNDER_HEAP;
 
     if ((intptr_t)end < (intptr_t)mcb->prev)
-        return -6;
+        return -E_PREV_BLOCK_OVER_HEAP;
 
     return 0;
 }
@@ -349,10 +348,10 @@ s32 Mem_ValidatePtr(void* ptr) {
 
     if (ptr == 0)
         return 0;
-    else if ((intptr_t)ptr < (intptr_t)heap->top)
-        return -10;
+    else if ((intptr_t)ptr < (intptr_t)heap->start)
+        return -E_PTR_UNDER_HEAP;
     else if ((intptr_t)ptr > (intptr_t)heap->end)
-        return -20;
+        return -E_PTR_OVER_HEAP;
     else
         return Mem_ValidateBlock(PTR_TO_BLOCK(ptr));
 }
@@ -385,7 +384,7 @@ u16 Mem_CalcBlockChecksum(MemControlBlock* mcb) {
 // Walks the heap, checking read-only blocks' checksums and every header's links
 void Mem_CheckHeapImpl(Heap* heap) {
     MemControlBlock* next;
-    MemControlBlock* cur = heap->top;
+    MemControlBlock* cur = heap->start;
 
     if (heap->active) {
         for (; cur != NULL; cur = cur->next) {
@@ -613,11 +612,11 @@ void Mem_MarkFree(MemControlBlock* mcb) {
 
     mcb->info.bits.debugIndex = 0;
     mcb->info.bits.subType = 0;
+    mcb->info.bits.checkSum = 0;
     mcb->attr.bits.owner = MEM_OWNER_FREE;
     mcb->attr.bits.ra = 0;
     mcb->attr.bits.readOnly = 0;
     mcb->attr.bits.unk29 = 0;
-    mcb->info.bits.checkSum = 0;
 
     if ((u32)mcb < (u32)heap->nextFree) {
         heap->nextFree = mcb;
@@ -703,7 +702,7 @@ void Mem_PrintBlock(MemControlBlock* mcb, s32 index) {
 
 // Prints every allocated block and every free block of 0x40 bytes or more
 void Mem_DumpHeap(Heap* heap) {
-    MemControlBlock* node = heap->top;
+    MemControlBlock* node = heap->start;
     s32 i;
 
     if (heap->hasFreedNodes) {
@@ -807,7 +806,7 @@ void Mem_SetCompactCursor(void* ptr) {
         sCompactCursor = PTR_TO_BLOCK(ptr);
         return;
     }
-    sCompactCursor = sHeaps[0].top;
+    sCompactCursor = sHeaps[0].start;
 }
 
 // Moves *handle's block to a lower address: into the first big enough free block between sCompactCursor
@@ -888,10 +887,24 @@ void Mem_SetOwner(s32 ptr, s32 ownerLess1) {
     mcb->attr.bits.owner = ownerLess1 + 1;
 }
 
+typedef enum AllocKind {
+    /* -1 */ AllocSentinal = -1,
+    /* 0 */ Alloc0,
+    /* 1 */Alloc1,
+    /* 2 */Alloc2,
+    /* 3 */Alloc3,
+    /* 4 */Alloc4,
+    /* 5 */Alloc5,
+    /* 6 */Alloc6,
+    /* 7 */AllocFree,
+    /* 8 */Alloc8,
+    /* 9 */Alloc9,
+} AllocKind;
+
 // Adds up the main heap's block sizes (headers included) into nine categories by owner, and by subType
 // for owner 7. Free blocks go in sizes[7]. Returns the heap size.
-s32 Mem_GetUsage(s32* sizes) {
-    MemControlBlock* cur = sHeaps[0].top;
+s32 Mem_GetUsage(s32 sizes[8]) {
+    MemControlBlock* cur = sHeaps[0].start;
     s32 i;
     s32 kind = 0;
 
@@ -902,36 +915,36 @@ s32 Mem_GetUsage(s32* sizes) {
     for (; cur != NULL; cur = cur->next) {
         switch (cur->attr.bits.owner) {
             case MEM_OWNER_END:
-                kind = -1;
+                kind = AllocSentinal;
                 break;
             case MEM_OWNER_FREE:
-                kind = 7;
+                kind = AllocFree;
                 break;
             case 13:
-                kind = 3;
+                kind = Alloc3;
                 break;
             case 12:
-                kind = 1;
+                kind = Alloc1;
                 break;
             case 7:
                 switch (cur->info.bits.subType) {
                     case 1:
-                        kind = 4;
+                        kind = Alloc4;
                         break;
                     case 2:
-                        kind = 5;
+                        kind = Alloc5;
                         break;
                     case 3:
-                        kind = 6;
+                        kind = Alloc6;
                         break;
                     case 4:
-                        kind = 8;
+                        kind = Alloc8;
                         break;
                     case 5:
-                        kind = 2;
+                        kind = Alloc2;
                         break;
                     case 0:
-                        kind = 0;
+                        kind = Alloc0;
                         break;
                 }
                 break;
@@ -939,13 +952,13 @@ s32 Mem_GetUsage(s32* sizes) {
             case 2:
             case 4:
             case 9:
-                kind = 2;
+                kind = Alloc2;
                 break;
             default:
-                kind = 0;
+                kind = Alloc0;
                 break;
         }
-        if (kind != -1) {
+        if (kind != AllocSentinal) {
             sizes[kind] += (uintptr_t)cur->next - (uintptr_t)cur;
         }
     }
@@ -955,7 +968,7 @@ s32 Mem_GetUsage(s32* sizes) {
 // Returns the largest free block in the main heap. Mode 1 merges free blocks first. Mode 2 first releases
 // everything the resource cache can give back.
 u32 Mem_GetLargestFree(s32 mode) {
-    MemControlBlock* cur = sHeaps[0].top;
+    MemControlBlock* cur = sHeaps[0].start;
     u32 curBlockSize;
     u32 maxBlockSize = 0;
 

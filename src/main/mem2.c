@@ -54,6 +54,7 @@ void* Mem_AllocAligned(s32 size, s32 align, s32 ownerLess1, char* file, s32 line
 }
 
 // Main allocation function. The block's debug name is "file:line".
+// Callers should use the enum `AllocOwner`, not the raw defines
 void* Mem_Alloc(s32 size, s32 ownerLess1, char* file, s32 line) {
     char str[0x400];
     void* ptr;
@@ -69,6 +70,7 @@ void* Mem_Alloc(s32 size, s32 ownerLess1, char* file, s32 line) {
 
 extern s8 D_00565DF0;
 // Allocates from the debug heap. Returns NULL outside debug mode.
+// Callers should use the enum `AllocOwner`, not the raw defines
 void* Mem_AllocDebug(s32 size, s32 ownerLess1, char* file, s32 line) {
     void* ptr;
     void* ra;
@@ -83,6 +85,7 @@ void* Mem_AllocDebug(s32 size, s32 ownerLess1, char* file, s32 line) {
 }
 
 // Like Mem_Alloc, but takes the highest free block that fits (allocates from the end of the heap)
+// Callers should use the enum `AllocOwner`, not the raw defines
 void* Mem_AllocFromEnd(s32 size, s32 ownerLess1, char* file, s32 line) {
     char str[0x400];
     void* ptr;
@@ -100,6 +103,7 @@ void* Mem_Realloc(void* ptr, u32 size, s32 owner) {
     return Mem_ReallocBlock(0, owner, ptr, size);
 }
 
+// Callers should use the enum `AllocOwner`, not the raw defines
 void Mem_Free(void* arg0, s32 ownerLess1) {
     Mem_FreeBlock(arg0, ownerLess1 + 1);
 }
