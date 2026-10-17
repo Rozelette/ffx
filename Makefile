@@ -59,6 +59,9 @@ OPT_FLAGS := -O2
 
 #### Main Targets ###
 
+report: all
+	$(TOOLS_DIR)/objdiff/objdiff-cli-linux-x86_64 report generate -o $(BUILD_DIR)/report.json
+
 all: rom
 
 rom: $(ROM)

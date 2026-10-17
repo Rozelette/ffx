@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/encounter/objdiff/main/config.schema.json",
+  "custom_make": "make",
+  "build_target": true,
+  "build_base": true,
+  "units": [
+    {
+      "name": "0",
+      "target_path": "build/asm/0.o",
+      "base_path": null,
+      "metadata": {
+        "progress_categories": ["game"]
+      }
+    },
+    {
+      "name": "main/mem",
+      "target_path": "build/asm/main/mem.o",
+      "base_path": "build/src/main/mem.o",
+      "metadata": {
+        "progress_categories": ["game"]
+      }
+    },
+    {
+      "name": "01D708",
+      "target_path": "build/asm/01D708.o",
+      "base_path": null,
+      "metadata": {
+        "progress_categories": ["game"]
+      }
+    }
+  ],
+  "progress_categories": [
+    {
+      "id": "game",
+      "name": "Game"
+    }
+  ]
+}
