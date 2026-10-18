@@ -5,7 +5,6 @@
 //
 // Each wrapper calls GetRa + Mem_SaveRA first, so the block records its caller's address.
 //
-// func_0011D718 (a realloc wrapper for owner 0xD) also belongs to this file. It is still in asm/01D718.s.
 
 #include "common.h"
 #include "mem.h"
@@ -68,13 +67,13 @@ void* Mem_Alloc(s32 size, s32 ownerLess1, char* file, s32 line) {
     return ptr;
 }
 
-extern s8 D_00565DF0;
+extern s8 gDebugMode;
 // Allocates from the debug heap. Returns NULL outside debug mode.
 // Callers should use the enum `AllocOwner`, not the raw defines
 void* Mem_AllocDebug(s32 size, s32 ownerLess1, char* file, s32 line) {
     void* ptr;
     void* ra;
-    if (D_00565DF0 == 0) {
+    if (gDebugMode == 0) {
         return NULL;
     }
     GetRa(&ra);

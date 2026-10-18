@@ -1,6 +1,5 @@
 MIPS_BINUTILS_PREFIX ?= mips-linux-gnu-
-
-BUILD_DIR := build
+VERSION ?= intl
 TOOLS_DIR := tools
 
 #TODO
@@ -28,16 +27,36 @@ RM_MDEBUG = $(OBJCOPY) --remove-section .mdebug $@
 OBJDUMP_CMD = $(OBJDUMP) $(OBJDUMP_FLAGS) $@ > $(@:.o=.s)
 OBJCOPY_BIN = $(OBJCOPY) -O binary $@ $@.bin
 
+# Each version gets its own asm, build output, linker inputs and checksum. src/ is shared, and the C
+# files use VERSION_INTL / VERSION_US_ALPHA where the versions differ.
+ifeq ($(VERSION), intl)
+  GAME_CODE := SLPS_250.88
+  VERSION_DEFINE := -DVERSION_INTL
+  ROM_PAD :=
+else ifeq ($(VERSION), us_alpha)
+  GAME_CODE := SLUS_203.12
+  VERSION_DEFINE := -DVERSION_US_ALPHA
+  # Pad the target ROM up to .sbss so it ends where the zerofill segment starts
+  ROM_PAD := --pad-to 0x56A300
+else
+  $(error Unsupported version $(VERSION))
+endif
+
+BUILD_DIR := build/$(VERSION)
+ASM_DIR := asm/$(VERSION)
+UNDEFINED_FUNCS := undefined_funcs_auto_$(VERSION).txt
+UNDEFINED_SYMS := undefined_syms_auto_$(VERSION).txt
+
 #### Files ####
 
 # ROM image
-ROM      := $(BUILD_DIR)/SLPS_250.88.rom
+ROM      := $(BUILD_DIR)/$(GAME_CODE).rom
 ELF      := $(ROM:.rom=.elf)
 MAP      := $(ROM:.rom=.map)
-LDSCRIPT := SLPS_250.88.ld
+LDSCRIPT := $(GAME_CODE).ld
 
 SRC_DIRS := $(shell find src -type d)
-ASM_DIRS := $(shell find asm -type d -not -path "asm/nonmatchings*")
+ASM_DIRS := $(shell find $(ASM_DIR) -type d -not -path "$(ASM_DIR)/nonmatchings*" 2>/dev/null)
 ASSET_DIRS := $(shell find assets -type d)
 LIB_DIRS      := $(foreach f,$(LIBULTRA_DIR),$f)
 
@@ -51,7 +70,7 @@ $(shell mkdir -p $(foreach dir,$(SRC_DIRS) $(ASM_DIRS) $(ASSET_DIRS) compressed 
 
 AS_FLAGS := -no-pad-sections -EL -march=5900 -mabi=eabi -I include
 C_FLAGS := -G0 -I include
-D_FLAGS := -D_LANGUAGE_C
+D_FLAGS := -D_LANGUAGE_C $(VERSION_DEFINE)
 C_FLAGS_INCLUDE := -I. -Iinclude
 AS_FLAGS_INCLUDE := -I. -Iinclude
 
@@ -62,13 +81,14 @@ OPT_FLAGS := -O2
 all: rom
 
 rom: $(ROM)
-	md5sum -c checksum.md5
+	md5sum -c checksum_$(VERSION).md5
 
 $(ROM): $(ELF)
 	$(OBJCOPY) --gap-fill=0x00 -O binary $< $@
 
-$(ELF): $(LDSCRIPT) $(O_FILES) undefined_funcs_auto.txt undefined_syms_auto.txt
-	$(LD) -T $(LDSCRIPT) -T undefined_funcs_auto.txt -T undefined_syms_auto.txt -EL -Map $(MAP) -o $@
+# The single LOAD segment is RWX by design (code and data share one segment, like the original ELF)
+$(ELF): $(LDSCRIPT) $(O_FILES) $(UNDEFINED_FUNCS) $(UNDEFINED_SYMS)
+	$(LD) -T $(LDSCRIPT) -T $(UNDEFINED_FUNCS) -T $(UNDEFINED_SYMS) -EL --no-warn-rwx-segments -Map $(MAP) -o $@
 
 diff-init: all
 	$(RM) -rf expected/$(BUILD_DIR)
@@ -76,8 +96,8 @@ diff-init: all
 	cp -r $(BUILD_DIR)/* expected/$(BUILD_DIR)
 
 extract:
-	$(RM) -r asm/$(VERSION) bin/$(VERSION)
-	$(SPLAT) SLPS_250.88.yaml $(SPLAT_FLAGS)
+	$(RM) -r $(ASM_DIR)
+	$(SPLAT) $(GAME_CODE).yaml $(SPLAT_FLAGS)
 
 init:
 	$(MAKE) distclean
@@ -89,7 +109,7 @@ init:
 #TODO better padding than hard-coded end address
 setup: venv
 	#$(MAKE) -C tools
-	$(OBJCOPY) -O binary --gap-fill=0x00 --pad-to 0x56A300 SLPS_250.88 SLPS_250.88.rom
+	$(OBJCOPY) -O binary --gap-fill=0x00 $(ROM_PAD) $(GAME_CODE) $(GAME_CODE).rom
 
 venv:
 # Create the virtual environment if it doesn't exist.
@@ -103,13 +123,13 @@ venv:
 ## Cleaning ##
 
 clean: libclean
-	$(RM) -r $(BUILD_DIR)/asm $(BUILD_DIR)/assets $(BUILD_DIR)/files $(BUILD_DIR)/compressed $(BUILD_DIR)/src $(ROM) $(ROMC) $(ELF) $(BUILD_DIR)/*.map
+	$(RM) -r $(BUILD_DIR)/asm $(BUILD_DIR)/assets $(BUILD_DIR)/files $(BUILD_DIR)/compressed $(BUILD_DIR)/src $(ROM) $(ELF) $(MAP)
 
 libclean:
 	$(RM) -r $(BUILD_DIR)/lib
 
 distclean: clean
-	$(RM) -r $(BUILD_DIR) asm/ assets/ files/ .splat/
+	$(RM) -r $(BUILD_DIR) $(ASM_DIR) .splache_$(VERSION)
 #	$(MAKE) -C tools distclean
 
 

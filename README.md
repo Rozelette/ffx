@@ -27,6 +27,17 @@ A `mips-linux-gnu` binutils toolchain is also required.
 
 This is still very much a work-in-progress. Many conveniences, such as file splitting, have not been done. For general documentation for how to contribute, see [Splat](https://github.com/ethteck/splat/wiki/General-Workflow).
 
+Two versions are supported. Pick one with `VERSION` (default `intl`) on every make command:
+
+| `VERSION` | Game | ELF to place in the repo root |
+| --- | --- | --- |
+| `intl` | Final Fantasy X International (JPN), `SLPS-25088` | `SLPS_250.88` |
+| `us_alpha` | US alpha, `SLUS-20312` | `SLUS_203.12` |
+
+For example `make VERSION=us_alpha init`. Each version has its own `asm/<version>`, `build/<version>` and
+`expected/build/<version>`. The C in `src/` is shared, with `#if defined(VERSION_US_ALPHA)` where they differ.
+For diffing, set it the same way: `VERSION=us_alpha ./diff.py -mwo <func_name>`.
+
 After creating a new file in the YAML, run `make extract`.
 To build the game, run `make all`.
 To set up diffing, run `make diff-init`.
