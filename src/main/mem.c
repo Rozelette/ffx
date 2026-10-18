@@ -9,9 +9,6 @@
 // sHeaps has room for three heaps, but Mem_Init only sets up two.
 //
 // The public wrappers (Mem_Alloc, Mem_Free, malloc, ...) are in mem2.c.
-//
-// The International and US alpha builds compile this file to the same code, only the addresses differ
-// (see symbol_addrs.txt and symbol_addrs_20312.txt). The #ifs below only pick each version's asm.
 
 #include "common.h"
 #include "mem.h"
@@ -62,11 +59,7 @@ void Mem_SetCompactCursor(void*);
 // libc
 void* memcpy(void* dst, const void* src, unsigned int size);
 void* memmove(void* dst, const void* src, unsigned int size);
-<<<<<<< HEAD
 
-=======
-// Dumps the resource cache (src/main 0x110CE0, not split yet)
->>>>>>> a67c0e8 (Build alpha again along with intl)
 extern void Cache_Dump(char*);
 
 void Mem_ClearDbgArea(void) {
@@ -695,11 +688,7 @@ void Mem_FreeBlock(void* ptr, s32 owner) {
     }
 }
 
-<<<<<<< HEAD
 // Debug mode only. Writes a buffer to "host0:<fileName>" on the dev PC.
-=======
-// Debug mode only. Sg_PcWrite (Sg_PcWrite) writes a buffer to "host0:<fileName>" on the dev PC.
->>>>>>> a67c0e8 (Build alpha again along with intl)
 void Mem_WriteToHost(void* ptr, char* fileName) {
     if (gDebugMode != 0) {
         MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
@@ -993,15 +982,9 @@ u32 Mem_GetLargestFree(s32 mode) {
     if (mode == 1) {
         Mem_MergeFreeBlocksMain();
     } else if (mode == 2) {
-<<<<<<< HEAD
         while (Ch_MemMove_Over() != 0)
             ;
         while (Cache_OverFlow() == 0)
-=======
-        while (Chr_ReleaseUnused() != 0)
-            ;
-        while (Cache_Release() == 0)
->>>>>>> a67c0e8 (Build alpha again along with intl)
             ;
     }
     for (; cur != NULL; cur = cur->next) {
