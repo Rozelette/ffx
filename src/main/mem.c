@@ -45,8 +45,8 @@ static const char sEmptyDebugName[] = "";
 static s32 sMemCurAlign; // Alignment mask for the next forward allocation, see Mem_SetAlignment
 static Heap sHeaps[3];
 static intptr_t sMemSavedRa;            // Packed return address stored into the next block's attr.bits.ra
-static s8 sMemUnk54; // Set but never read
-static s8 sMemUnk55; // Set but never read
+static s8 sMemUnk54;                    // Set but never read
+static s8 sMemUnk55;                    // Set but never read
 static MemControlBlock* sCompactCursor; // Where Mem_CompactBlock starts looking for free space
 
 void Mem_InsertFreeBlock(s32, MemControlBlock*, MemControlBlock*, MemControlBlock*);
@@ -358,7 +358,6 @@ s32 Mem_ValidatePtr(void* ptr) {
 void Mem_CheckMCB(MemControlBlock* mcb) {
     s32 ret = Mem_ValidateBlock(mcb);
     if (ret != 0) {
-        // yiAssert(0, title, fmt, ...) reports an error (not split yet)
         yiAssert(0, "SG:MemCheckMCBerr", "the MCB broken maybe.code=%d\n", ret);
     }
 }
@@ -543,8 +542,8 @@ fail:
         }
     }
     DebugPrintf("%sMemory Not Enough\nfile=%s\nFunction [%s + %xh]\nsize=%d(%xh)\n",
-                  heapIdx ? "Debug " : sEmptyDebugName, printedName, Sg_GetFuncName(sMemSavedRa << 2),
-                  (sMemSavedRa << 2) - Sg_GetLastFuncAddr(), aligned, aligned);
+                heapIdx ? "Debug " : sEmptyDebugName, printedName, Sg_GetFuncName(sMemSavedRa << 2),
+                (sMemSavedRa << 2) - Sg_GetLastFuncAddr(), aligned, aligned);
     Break();
     goto masterRetry;
 found:
@@ -689,7 +688,7 @@ void Mem_FreeBlock(void* ptr, s32 owner) {
     }
 }
 
-// Debug mode only. Sg_PcWrite (Sg_PcWrite) writes a buffer to "host0:<fileName>" on the dev PC.
+// Debug mode only. Writes a buffer to "host0:<fileName>" on the dev PC.
 void Mem_WriteToHost(void* ptr, char* fileName) {
     if (gDebugMode != 0) {
         MemControlBlock* mcb = (MemControlBlock*)ptr - 1;
