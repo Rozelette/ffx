@@ -41,7 +41,7 @@ typedef enum AllocOwner {
 } AllocOwner;
 
 // Errors returned by Mem_ValidateBlock
-// Under refers to having anddress before the `top`
+// Under refers to having anddress before the `start`
 // Over refers to having an address after the `end`
 #define E_BLOCK_UNDER_HEAP 1
 #define E_BLOCK_OVER_HEAP 2

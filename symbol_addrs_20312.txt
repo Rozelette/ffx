@@ -565,6 +565,9 @@ Mem_SetSubType = 0x0011CF80; // type:func
 Mem_SetOwner = 0x0011CFA8; // type:func
 Mem_GetUsage = 0x0011CFD0; // type:func
 Mem_GetLargestFree = 0x0011D140; // type:func
+Mem_SetUnk54 = 0x0011BD38; // type:func
+Mem_SetUnk55 = 0x0011BD48; // type:func
+Mem_Unused = 0x0011C308; // type:func
 sDebugFailedAlloc = 0x00309F58; // type:s32
 sMemOwnerNames = 0x00309F60;
 sEmptyDebugName = 0x00550438;
@@ -572,6 +575,8 @@ sMemCurAlign = 0x0056E040; // type:s32
 sHeaps = 0x0056E048; // type:Heap
 sMemSavedRa = 0x0056E090; // type:s32
 sCompactCursor = 0x0056E098;
+sMemUnk54 = 0x0056E094; // type:s8
+sMemUnk55 = 0x0056E095; // type:s8
 
 // mem2.c
 Mem_AllocAligned = 0x0011D1F8; // type:func
@@ -592,19 +597,15 @@ Mem_StrDup = 0x0011D698; // type:func
 Mem_ReallocOwnerD = 0x0011D6E0; // type:func
 sMem2SavedRA = 0x0056E09C; // type:s32
 
-// Used by mem.c / mem2.c. Provisional names, from what each one visibly does:
-gDebugMode = 0x0054CAF4; // type:s8 Enables the debug heap and debug allocation names
-sMemUnk54 = 0x0056E094; // type:s8 mem.c bss, only ever set
-sMemUnk55 = 0x0056E095; // type:s8 mem.c bss, only ever set
-Mem_SetUnk54 = 0x0011BD38; // type:func
-Mem_SetUnk55 = 0x0011BD48; // type:func
-Mem_Unused = 0x0011C308; // type:func Empty, no callers
-Chr_ReleaseUnused = 0x001035F8; // type:func src/chr/chr.c. Repeats a release step until nothing is left, returns the count
-Chr_DumpRecent = 0x001037F8; // type:func Walks a 128 entry ring buffer, prints nothing. Probably a stripped debug dump
+
+// Symbols in files not yet split. These should be moved to their own group once decompiled
+gDebugMode = 0x0054CAF4; // type:s8
+Ch_MemMove_Over = 0x001035F8; // type:func src/chr/chr.c. Repeats a release step until nothing is left, returns the count
+Ch_FunctionHistoryDump = 0x001037F8; // type:func Walks a 128 entry ring buffer, prints nothing. Probably a stripped debug dump
 Cache_Dump = 0x00110CB0; // type:func Prints the resource cache under a title ("Cache Dump")
-Cache_Release = 0x00110D40; // type:func Releases cached resources, used for out-of-memory retries
-SymTab_GetFuncName = 0x0011A300; // type:func Name of the function containing an address
-SymTab_GetFuncStart = 0x0011A398; // type:func Start address of the function containing an address
+Cache_OverFlow = 0x00110D40; // type:func Releases cached resources, used for out-of-memory retries
+Sg_GetFuncName = 0x0011A300; // type:func Name of the function containing an address
+Sg_GetLastFuncAddr = 0x0011A398; // type:func Start address of the function containing an address
 Sg_PcWrite = 0x0011F158; // type:func Writes a buffer to a file on the host PC
 DebugPrintf = 0x001200D0; // type:func printf through a 0x400 byte vsprintf buffer
-ErrorReport = 0x0017B9F8; // type:func (0, title, fmt, ...)
+yiAssert = 0x0017B9F8; // type:func
