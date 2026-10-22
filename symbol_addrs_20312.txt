@@ -565,13 +565,6 @@ Mem_SetSubType = 0x0011CF80; // type:func
 Mem_SetOwner = 0x0011CFA8; // type:func
 Mem_GetUsage = 0x0011CFD0; // type:func
 Mem_GetLargestFree = 0x0011D140; // type:func
-<<<<<<< HEAD
-
-=======
-Mem_SetUnk54 = 0x0011BD38; // type:func
-Mem_SetUnk55 = 0x0011BD48; // type:func
-Mem_Unused = 0x0011C308; // type:func
->>>>>>> f330321 (Use original names for externals)
 sDebugFailedAlloc = 0x00309F58; // type:s32
 sMemOwnerNames = 0x00309F60;
 sEmptyDebugName = 0x00550438;
