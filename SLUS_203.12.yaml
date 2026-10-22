@@ -71,6 +71,8 @@ segments:
     vram: 0x00100000
     subsegments:
       - [0x000000, asm, 000000]
+      - [0x019F00, c, dbg/elf]
+      - [0x01A3F8, asm, 1A3F8]
       - [0x01b9e8, c, main/mem]
       - [0x01d1f8, c, main/mem2]
       - [0x01d708, asm, 01D708]
@@ -78,6 +80,8 @@ segments:
       - [0x209F58, .data, main/mem]
       - [0x209FA0, data, 209FA0]
       - [0x44F800, rodata, 44F800]
+      - [0x450328, .rodata, dbg/elf]
+      - [0x4503A8, rodata, 4503A8]
       - [0x4503C0, .rodata, main/mem]
       - [0x4505C8, .rodata, main/mem2]
       - [0x450630, rodata, 450630]
@@ -93,6 +97,8 @@ segments:
     subsegments:
       - { type: sbss, vram: 0x0056A300, name: 0056A300 }
       - { type: bss, vram: 0x0056A380, name: 0056A380 }
+      - { type: .bss, vram: 0x0056DC54, name: dbg/elf }
+      - { type: bss, vram: 0x0056DC6C, name: 0056DC6C }
       - { type: .bss, vram: 0x0056E040, name: main/mem }
       - { type: bss, vram: 0x0056E09C, name: 0056E09C }
   - [0x46A300]
