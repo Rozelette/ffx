@@ -99,6 +99,8 @@ void Mem_SetDebugName(void* ptr, char* file, int line);
 void* Mem_AllocBlock(s32 fromEnd, s32 heapIdx, s32 owner, s32 size, s8* name);
 void* Mem_ReallocBlock(int heapIdx, int owner, void* ptr, unsigned int size);
 void Mem_FreeBlock(void* ptr, s32 owner);
+extern void* Mem_AllocDefault(s32 arg0);
+extern void Mem_FreeDefault(void* arg0);
 
 static inline void GetRa(void** ra) {
     asm("move $15, %0\n\t"
