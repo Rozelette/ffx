@@ -240,8 +240,8 @@ dptofp = 0x002EC0D0; // type:func
 fptoui = 0x002ECBC8; // type:func
 fptodp = 0x002ECCC8; // type:func
 
-// libc (newlib). These sit in asm/01D718.s around 0x2EE000-0x2F5000 and should eventually be split out
-// into a lib/ directory (not done yet).
+// libc (newlib). These sit in asm/intl/01D740.s around 0x2EE000-0x2F5000 and should eventually be split
+// out into a lib/ directory (not done yet).
 memcmp = 0x002EEB18; // type:func
 memcpy = 0x002EEBAC; // type:func
 memmove = 0x002EEC5C; // type:func
@@ -560,6 +560,8 @@ Mem_SetSubType = 0x0011CFB8; // type:func
 Mem_SetOwner = 0x0011CFE0; // type:func
 Mem_GetUsage = 0x0011D008; // type:func
 Mem_GetLargestFree = 0x0011D178; // type:func
+Mem_SetUnk54 = 0x0011BD70; // type:func
+Mem_SetUnk55 = 0x0011BD80; // type:func
 sDebugFailedAlloc = 0x00307BD8; // type:s32
 sMemOwnerNames = 0x00307BE0;
 sEmptyDebugName = 0x00569758;
@@ -567,6 +569,9 @@ sMemCurAlign = 0x00580440; // type:s32
 sHeaps = 0x00580448; // type:Heap
 sMemSavedRa = 0x00580490; // type:s32
 sCompactCursor = 0x00580498;
+sMemUnk54 = 0x00580494; // type:s8 mem.c
+sMemUnk55 = 0x00580495; // type:s8 mem.c
+
 
 // mem2.c
 Mem_AllocAligned = 0x0011D230; // type:func
@@ -586,3 +591,15 @@ Mem_FreeAny = 0x0011D6C8; // type:func
 Mem_StrDup = 0x0011D6D0; // type:func
 Mem_ReallocOwnerD = 0x0011D718; // type:func
 sMem2SavedRA = 0x0058049C; // type:s32
+
+// Symbols in files not yet split. These should be moved to their own group once decompiled
+gDebugMode = 0x00565DF0; // type:s8
+Ch_MemMove_Over = 0x00103628; // type:func src/chr/chr.c. Repeats a release step until nothing is left, returns the count
+Ch_FunctionHistoryDump = 0x00103828; // type:func Walks a 128 entry ring buffer, prints nothing. Probably a stripped debug dump
+Cache_Dump = 0x00110CE0; // type:func Prints the resource cache under a title ("Cache Dump")
+Cache_OverFlow = 0x00110D70; // type:func Releases cached resources, used for out-of-memory retries
+Sg_GetFuncName = 0x0011A330; // type:func Name of the function containing an address
+Sg_GetLastFuncAddr = 0x0011A3C8; // type:func Start address of the function containing an address
+Sg_PcWrite = 0x0011F190; // type:func Writes a buffer to a file on the host PC
+DebugPrintf = 0x00120108; // type:func printf through a 0x400 byte vsprintf buffer
+yiAssert = 0x00179058; // type:func

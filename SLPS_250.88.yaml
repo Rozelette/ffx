@@ -1,9 +1,9 @@
 # name: Your game name here!
-#sha1: d53afe7b98625a3812b22a134ac84280b2246cb1
+#sha1: 143a49aad843f367036e7dbfcce3094fbd5b4ca1
 options:
   basename: SLPS_250.88
   target_path: SLPS_250.88.rom
-  elf_path: build/SLPS_250.88.elf
+  elf_path: build/intl/SLPS_250.88.elf
   base_path: .
   platform: ps2
   compiler: EEGCC
@@ -11,9 +11,10 @@ options:
   gp_value: 0x005841F0
   ld_gp_expression: cod_LIT4_START + 0x7FF0
 
-  # asm_path: asm
-  # src_path: src
-  # build_path: build
+  asm_path: asm/intl
+  build_path: build/intl
+  cache_path: .splache_intl
+  asset_path: assets/intl
 
   ld_script_path: SLPS_250.88.ld
   ld_dependencies: True
@@ -31,8 +32,8 @@ options:
   reloc_addrs_path:
     - reloc_addrs.txt
 
-  # undefined_funcs_auto_path: undefined_funcs_auto.txt
-  # undefined_syms_auto_path: undefined_syms_auto.txt
+  undefined_funcs_auto_path: undefined_funcs_auto_intl.txt
+  undefined_syms_auto_path: undefined_syms_auto_intl.txt
 
   extensions_path: tools/splat_ext
 
@@ -66,7 +67,6 @@ segments:
     type: code
     start: 0x000000
     vram: 0x00100000
-    bss_size: 0x2187AC
     subsegments:
       - [0x000000, asm, 000000]
       #- [0x01b9a0, c, test]
