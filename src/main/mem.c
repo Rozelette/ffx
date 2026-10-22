@@ -542,8 +542,8 @@ fail:
         }
     }
     DebugPrintf("%sMemory Not Enough\nfile=%s\nFunction [%s + %xh]\nsize=%d(%xh)\n",
-                heapIdx ? "Debug " : sEmptyDebugName, printedName, Sg_GetFuncName(sMemSavedRa << 2),
-                (sMemSavedRa << 2) - Elf_GetFuncNameFromAddr(), aligned, aligned);
+                heapIdx ? "Debug " : sEmptyDebugName, printedName, Elf_GetFuncNameFromAddr(sMemSavedRa << 2),
+                (sMemSavedRa << 2) - Elf_GetLastFuncAddr(), aligned, aligned);
     Break();
     goto masterRetry;
 found:

@@ -594,12 +594,15 @@ Mem_ReallocOwnerD = 0x0011D718; // type:func
 sMem2SavedRA = 0x0058049C; // type:s32
 
 // elf.c
+Elf_SymAddrComparator = 0x00119F30; // type:func
+Elf_ParseSymbols = 0x00119F90; // type:func Original name Sg_AnalysysELFformat
 Elf_GetFuncNameFromAddr = 0x0011A330; // type:func
 Elf_GetLastFuncAddr = 0x0011A3C8; // type:func
+Elf_GetLastFuncSize = 0x0011A3F8; // type:func
 sSymTbl = 0x0058005C; // type:u32
 sStringTbl = 0x00580060; // type:u32
 sFirstFuncIdx = 0x00580054; // type:s32
-sLastFuncIdx = 0x00580058; // type:s32
+sFuncCount = 0x00580058; // type:s32
 sHasFuncSyms = 0x00580064; // type:u8
 sLastFoundFunc = 0x00580068; // type:u32
 
@@ -614,7 +617,6 @@ Cache_OverFlow = 0x00110D70; // type:func Releases cached resources, used for ou
 Sg_PcWrite = 0x0011F190; // type:func Writes a buffer to a file on the host PC
 DebugPrintf = 0x00120108; // type:func printf through a 0x400 byte vsprintf buffer
 yiAssert = 0x00179058; // type:func
-Sg_AnalysysELFformat = 0x00119F90; //type:func
 Sg_PcReadL = 0x0011EE60; // type:func
 
 // blocks of data that have entries that look like pointers but aren't

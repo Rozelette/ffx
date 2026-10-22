@@ -10,7 +10,7 @@ extern int sceLseek(int fd, int offset, int whence);
 extern void qsort(void* ptr, int count, int size, int (*comp)(const void*, const void*));
 
 static int sFirstFuncIdx;
-static int sLastFuncIdx;
+static int sFuncCount;
 static s8* sSymTbl;
 static char* sStringTbl;
 static u8 sHasFuncSyms;
@@ -60,7 +60,6 @@ void Elf_ParseSymbols(char* path) {
     sHasFuncSyms = 0;
     symPtr = 0x05F01000;
     strTblHdr = NULL;
-    sHasFuncSyms = 0;
 
     hdrPtr = &hdr;
     printf("Sg_AnalysysELFformat:%s\n", path);
@@ -107,7 +106,7 @@ void Elf_ParseSymbols(char* path) {
         printf("sg_debug_last=%x\n", (s8*)symPtr);
         if ((sSymTbl != NULL) && (sStringTbl != NULL)) {
             qsort(sSymTbl, numSyms, sizeof(Elf32_Sym), Elf_SymAddrComparator);
-            sLastFuncIdx = 0;
+            sFuncCount = 0;
             sFirstFuncIdx = 0;
             i = 0;
 
@@ -123,14 +122,14 @@ void Elf_ParseSymbols(char* path) {
             for (i2 = sFirstFuncIdx; i2 < numSyms; i2++) {
                 if (((Elf32_Sym*)(sSymTbl))[i2].st_info == ELF32_ST_INFO(STB_LOCAL, STT_FUNC) ||
                     ((Elf32_Sym*)(sSymTbl))[i2].st_info == ELF32_ST_INFO(STB_GLOBAL, STT_FUNC)) {
-                    sLastFuncIdx++;
+                    sFuncCount++;
                     continue;
                 }
                 break;
             }
 
-            printf("top=%d nb=%d\n", sFirstFuncIdx, sLastFuncIdx);
-            if (sLastFuncIdx != 0) {
+            printf("top=%d nb=%d\n", sFirstFuncIdx, sFuncCount);
+            if (sFuncCount != 0) {
                 sHasFuncSyms = 1;
             }
         }
@@ -153,7 +152,7 @@ char* Elf_GetFuncNameFromAddr(u32 addr) {
     }
 
     firstSym = (Elf32_Sym*)sSymTbl;
-    i = sLastFuncIdx;
+    i = sFuncCount;
     sym = &firstSym[sFirstFuncIdx];
 
     for (; --i != -1; sym++) {
