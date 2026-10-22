@@ -43,7 +43,7 @@ options:
   data_string_guesser_level: 2
 
   named_regs_for_c_funcs: False
-  mips_abi_gpr: o32
+  mips_abi_gpr: numeric
   subalign: 0x8
 
   section_order:
