@@ -1,8 +1,6 @@
 #ifndef MEM_H
 #define MEM_H
 
-typedef unsigned int u_long128 __attribute__((mode(TI)));
-
 // Block owner IDs (MemControlBlock.attr.bits.owner).
 // Callers of Mem_Alloc and friends pass the owner minus one; the stored value indexes sMemOwnerNames in mem.c.
 // These defines should only be used inside the allocate. External users should use the enum `AllocOwner`

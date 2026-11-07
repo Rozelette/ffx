@@ -12,6 +12,11 @@
 
 #include "common.h"
 #include "mem.h"
+#include <stddef.h>
+#include <string.h>
+#include <stdio.h>
+
+#include <eetypes.h>
 
 // Debug allocation name table, only present when gDebugMode is set
 #define MEM_DEBUG_INFO ((MemDebugInfo*)0x05FB0000)
@@ -107,13 +112,6 @@ MemDebugInfo* Mem_GetDebugName(void* ptr) {
     }
     return &arr[(mcb->info.raw >> 16) & 0x7FF];
 }
-
-// libc
-int sprintf(char* str, const char* fmt, ...);
-void* memset(void*, s32, s32);
-int strlen(char*);
-int strncpy(char*, char*, int);
-int printf(const char* fmt, ...);
 
 // Stores "file:line" in a MEM_DEBUG_INFO slot for the block. File names that are too long keep their end
 // and get a '*' as the first character. Reuses the block's slot if it already has one, otherwise takes
