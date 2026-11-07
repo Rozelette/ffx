@@ -3,7 +3,7 @@ VERSION ?= intl
 TOOLS_DIR := tools
 
 #TODO
-CC := COMPILER_PATH=$(TOOLS_DIR)/cc/ee-gcc2.9-991111/lib/gcc-lib/ee/2.9-ee-991111 $(TOOLS_DIR)/cc/ee-gcc2.9-991111/bin/ee-gcc
+CC := COMPILER_PATH=$(TOOLS_DIR)/cc/ee-gcc2.9-991111-01-dtls13010/lib/gcc-lib/ee/2.9-ee-991111-01-dtls13010 $(TOOLS_DIR)/cc/ee-gcc2.9-991111-01-dtls13010/bin/ee-gcc
 
 AS      := $(MIPS_BINUTILS_PREFIX)as
 LD      := $(MIPS_BINUTILS_PREFIX)ld
@@ -23,7 +23,6 @@ SPLAT_FLAGS       ?=
 OBJDUMP_FLAGS := --disassemble --reloc --disassemble-zeroes -Mreg-names=32
 
 RM_MDEBUG = $(OBJCOPY) --remove-section .mdebug $@
-
 OBJDUMP_CMD = $(OBJDUMP) $(OBJDUMP_FLAGS) $@ > $(@:.o=.s)
 OBJCOPY_BIN = $(OBJCOPY) -O binary $@ $@.bin
 
@@ -68,10 +67,11 @@ O_FILES        := $(foreach f,$(C_FILES:.c=.o),$(BUILD_DIR)/$f) \
 # create build directories
 $(shell mkdir -p $(foreach dir,$(SRC_DIRS) $(ASM_DIRS) $(ASSET_DIRS) compressed files $(LIB_DIRS),$(BUILD_DIR)/$(dir)))
 
-AS_FLAGS := -no-pad-sections -EL -march=5900 -mabi=eabi -I include
+AS_FLAGS := -no-pad-sections -EL -march=5900 -mabi=eabi -I include -I include/ps2
 C_FLAGS := -G0 -I include
+C_FLAGS_DEF := 
 D_FLAGS := -D_LANGUAGE_C $(VERSION_DEFINE)
-C_FLAGS_INCLUDE := -I. -Iinclude
+C_FLAGS_INCLUDE := -I. -Iinclude -isystem include/ps2 -isystem include/ps2/libc
 AS_FLAGS_INCLUDE := -I. -Iinclude
 
 OPT_FLAGS := -O2
@@ -137,8 +137,17 @@ distclean: clean
 
 #### Various Recipes ####
 
+# Line numbers for `diff.py -o --line-numbers`/`--source`. The SCE assembler writes a broken .symtab
+# with -g and keeps line info only in .mdebug, so assemble the compiler output with GNU as instead,
+# which turns the stabs into .stab sections objdump can read. Two encodings differ between the
+# assemblers: SCE `move` is daddu (GNU uses or) and the divide check is `break 0,7` (GNU: break 7).
+# $(BUILD_DIR)/%.o: %.c
+# 		$(CC) -S -g $(C_FLAGS) $(OPT_FLAGS) $(D_FLAGS) $(C_FLAGS_INCLUDE) -o $(@:.o=.gcc.s) $<
+# 		python3 tools/fix_stabs.py < $(@:.o=.gcc.s) | $(AS) $(AS_FLAGS) $(AS_FLAGS_INCLUDE) -o $@
+# 		$(OBJDUMP_CMD)
+
 $(BUILD_DIR)/%.o: %.c
-	$(CC) -c $(C_FLAGS) $(OPT_FLAGS) $(D_FLAGS) $(C_FLAGS_INCLUDE) -o $@ $<
+	$(CC) -c $(C_FLAGS) $(OPT_FLAGS) $(D_FLAGS) $(C_FLAGS_INCLUDE) $(C_FLAGS_DEF) -o $@ $<
 	$(OBJDUMP_CMD)
 	$(RM_MDEBUG)
 
