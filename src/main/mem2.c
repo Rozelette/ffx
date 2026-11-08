@@ -8,15 +8,14 @@
 
 #include "common.h"
 #include "mem.h"
-
+#include <stdio.h>
 // TODO fix the padding
 static void foo() {
 }
 
 // This can't be in the header because this file assume it returns void* (or was implicitly called)
 void* Mem_SaveRA(void*);
-// libc
-int printf(const char* fmt, ...);
+
 
 // Allocates with the start of the data aligned to align (a power of two). If the first try isn't aligned,
 // it frees it, allocates a filler block to push the next allocation to an aligned address, allocates again

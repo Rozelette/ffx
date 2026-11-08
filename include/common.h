@@ -25,7 +25,6 @@ typedef volatile u64 vu64;
 
 typedef unsigned int uintptr_t;
 typedef int intptr_t;
-typedef int ptrdiff_t;
 
 typedef union {
     vs8 s8;
