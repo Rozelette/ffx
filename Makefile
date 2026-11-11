@@ -69,7 +69,7 @@ O_FILES        := $(foreach f,$(C_FILES:.c=.o),$(BUILD_DIR)/$f) \
 $(shell mkdir -p $(foreach dir,$(SRC_DIRS) $(ASM_DIRS) $(ASSET_DIRS) compressed files $(LIB_DIRS),$(BUILD_DIR)/$(dir)))
 
 AS_FLAGS := -no-pad-sections -EL -march=5900 -mabi=eabi -I include
-C_FLAGS := -G0 -I include
+C_FLAGS := -G0 -I include -nostdlib -nostdinc
 D_FLAGS := -D_LANGUAGE_C $(VERSION_DEFINE)
 C_FLAGS_INCLUDE := -I. -Iinclude
 AS_FLAGS_INCLUDE := -I. -Iinclude

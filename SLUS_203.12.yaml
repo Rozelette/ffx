@@ -73,6 +73,7 @@ segments:
       - [0x000000, asm, 000000]
       - [0x019F00, c, dbg/elf]
       - [0x01A3F8, asm, 1A3F8]
+      - [0x01b9a0, c, main/main]
       - [0x01b9e8, c, main/mem]
       - [0x01d1f8, c, main/mem2]
       - [0x01d708, asm, 01D708]

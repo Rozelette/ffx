@@ -69,9 +69,9 @@ segments:
     vram: 0x00100000
     subsegments:
       - [0x000000, asm, 000000]
-      #- [0x01b9a0, c, test]
       - [0x019F30, c, dbg/elf]
-      - [0x1A428, asm, 1A428]
+      - [0x01A428, asm, 1A428]
+      - [0x01B9D8, c, main/main]
       - [0x01BA20, c, main/mem]
       - [0x01d230, c, main/mem2]
       - [0x01d740, asm, 01D740]
